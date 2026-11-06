@@ -2,11 +2,11 @@
 
 FROM oven/bun:1.4-alpine AS deps
 WORKDIR /app
-# Needed only to install @arthurzakharov/family-budget-be-client from GitHub Packages
-# (.npmrc reads it). It stays in this stage and never reaches the runtime image.
-ARG GITHUB_TOKEN
 COPY package.json bun.lock bunfig.toml .npmrc ./
-RUN GITHUB_TOKEN="$GITHUB_TOKEN" bun install --frozen-lockfile --production --ignore-scripts
+# The token (read by .npmrc) installs @arthurzakharov/family-budget-be-client from GitHub Packages.
+# It is mounted as a build secret, so it never lands in an image layer.
+RUN --mount=type=secret,id=github_token \
+    GITHUB_TOKEN="$(cat /run/secrets/github_token)" bun install --frozen-lockfile --production --ignore-scripts
 
 FROM oven/bun:1.4-alpine AS runtime
 WORKDIR /app
@@ -18,7 +18,7 @@ COPY package.json bunfig.toml tsconfig.json ./
 COPY src ./src
 
 USER bun
-# Render sets PORT; Bun.serve reads it (defaults to 3000).
+# The platform sets PORT; Bun.serve reads it (defaults to 3000).
 EXPOSE 3000
 
 CMD ["bun", "src/server/index.ts"]
