@@ -5,7 +5,7 @@
     "": {
       "name": "bun-react-template",
       "dependencies": {
-        "@arthurzakharov/family-budget-be-client": "file:../familly-budget-be/dist-client",
+        "@arthurzakharov/family-budget-be-client": "0.1.0",
         "@tanstack/react-router": "1.170.1",
         "hono": "^4.13.12",
         "react": "^19",
@@ -22,7 +22,7 @@
     },
   },
   "packages": {
-    "@arthurzakharov/family-budget-be-client": ["@arthurzakharov/family-budget-be-client@file:../familly-budget-be/dist-client", { "peerDependencies": { "hono": "^4.13.12" } }],
+    "@arthurzakharov/family-budget-be-client": ["@arthurzakharov/family-budget-be-client@0.1.0", "https://npm.pkg.github.com/download/@arthurzakharov/family-budget-be-client/0.1.0/56d51800bc9c78d694d63acb2c064994487b3c04", { "peerDependencies": { "hono": "^4.13.12" } }, "sha512-cDfteq08bBNTyOTWkkD7ITT+L3OmDQhjgJ2s9ZFsMthbeJ7Y7/G4fXK9I7agbKUlM7vdFXAgcCgrcVBle1lvTA=="],
 
     "@tanstack/history": ["@tanstack/history@1.162.0", "", {}, "sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA=="],
 

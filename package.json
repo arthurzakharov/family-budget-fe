@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production bun src/server/index.ts"
   },
   "dependencies": {
-    "@arthurzakharov/family-budget-be-client": "file:../familly-budget-be/dist-client",
+    "@arthurzakharov/family-budget-be-client": "0.1.0",
     "@tanstack/react-router": "1.170.1",
     "hono": "^4.13.12",
     "react": "^19",
