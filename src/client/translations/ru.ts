@@ -140,6 +140,7 @@ export const ru: Record<TranslationKey, string> = {
   "common.edit": "Изменить",
   "common.delete": "Удалить",
   "common.cancel": "Отмена",
+  "common.loading": "Загрузка…",
   "common.saveChanges": "Сохранить изменения",
   "common.date": "Дата",
   "common.tax": "Налог",

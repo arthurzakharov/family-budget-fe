@@ -4,6 +4,8 @@ import { RateTable } from "@client/components/deposit/RateTable";
 import { TransactionTable } from "@client/components/deposit/TransactionTable";
 import { PayoutTable } from "@client/components/deposit/PayoutTable";
 import { GroupSummaryTable } from "@client/components/deposit/GroupSummaryTable";
+import { Section, Stat, StatGrid } from "@client/components/ui";
+import { formatCents } from "@client/utils/format";
 import { forGroups } from "@shared/interest";
 
 type Props = {
@@ -22,25 +24,31 @@ export function Overview({ groupIds, showRates = false }: Props) {
 
   return (
     <>
+      <StatGrid>
+        <Stat label={t("totals.balance")} value={formatCents(view.balance)} tone="accent" />
+        <Stat label={t("totals.interestAfterTax")} value={formatCents(view.net)} tone="success" />
+        <Stat label={t("totals.pending")} value={formatCents(view.pending)} />
+      </StatGrid>
+
       {showRates && (
-        <>
-          <h2>{t("rates.title")}</h2>
+        <Section title={t("rates.title")}>
           <RateTable rates={rates} members={members} />
-        </>
+        </Section>
       )}
 
-      <h2>{t("transactions.title")}</h2>
-      <TransactionTable transactions={shown} groups={groups} members={members} totals={view} />
+      <Section title={t("transactions.title")}>
+        <TransactionTable transactions={shown} groups={groups} members={members} totals={view} />
+      </Section>
 
-      <h2>{t("payouts.title")}</h2>
-      <PayoutTable interest={view} groups={groups} />
+      <Section title={t("payouts.title")}>
+        <PayoutTable interest={view} groups={groups} />
+      </Section>
 
       {/* With one group the table would only repeat the totals above, as on Crypto and Expenses. */}
       {groupIds.length > 1 && (
-        <>
-          <h2>{t("perGroup.title")}</h2>
+        <Section title={t("perGroup.title")}>
           <GroupSummaryTable interest={view} groups={groups} />
-        </>
+        </Section>
       )}
     </>
   );

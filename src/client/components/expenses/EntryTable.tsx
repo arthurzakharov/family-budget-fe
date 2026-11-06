@@ -1,9 +1,11 @@
+import { Chip, Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { useCurrentUser } from "@client/context/auth";
 import { hasSeveralGroups } from "@client/utils/access";
 import { useSort } from "@client/utils/sort";
 import { addedBy, formatCents, nameOf } from "@client/utils/format";
+import { DataTable, editingRow, Money, RowActions } from "@client/components/ui";
 import { kindOf, signedEntry } from "@shared/expenses";
 import type { ExpenseEntry } from "@arthurzakharov/family-budget-be-client";
 
@@ -32,51 +34,51 @@ export function EntryTable({ entries, onEdit, onDelete, editingId }: Props) {
     if (key === "category") return categoryName(t, a.categoryId).localeCompare(categoryName(t, b.categoryId));
     return a.date.localeCompare(b.date);
   };
-  const { sorted, header } = useSort(entries, compare);
+  const { sorted, column, sortProps } = useSort(entries, compare);
 
   return (
-    <table>
-      <thead>
-        <tr>
-          {showGroup && header("group", t("transactions.group"))}
-          <th>{t("common.addedBy")}</th>
-          <th>{t("transactions.type")}</th>
-          {header("category", t("expenses.category"))}
-          {header("date", t("common.date"))}
-          {header("amount", t("transactions.amount"))}
-          <th>{t("expenses.note")}</th>
-          {editable && <th></th>}
-        </tr>
-      </thead>
-      <tbody>
-        {entries.length === 0 ? (
-          <tr>
-            <td colSpan={6 + (showGroup ? 1 : 0) + (editable ? 1 : 0)}>{t("expenses.empty")}</td>
-          </tr>
-        ) : (
-          sorted.map(e => (
-            <tr key={e.id} className={e.id === editingId ? "editing" : ""}>
-              {showGroup && <td>{nameOf(groups, e.groupId)}</td>}
-              <td>{addedBy(members, e.userId, t)}</td>
-              <td>{t(kindOf(categories, e.categoryId) === "income" ? "type.income" : "type.expense")}</td>
-              <td>{categoryName(t, e.categoryId)}</td>
-              <td>{e.date}</td>
-              <td>{formatCents(signedEntry(categories, e))}</td>
-              <td>{e.note}</td>
-              {editable && (
-                <td>
-                  <button type="button" onClick={() => onEdit!(e)}>
-                    {t("common.edit")}
-                  </button>{" "}
-                  <button type="button" onClick={() => onDelete!(e)}>
-                    {t("common.delete")}
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
+    <DataTable
+      label={t("expenses.records")}
+      emptyText={t("expenses.empty")}
+      {...sortProps}
+      columns={
+        <>
+          {showGroup && column("group", t("transactions.group"))}
+          <Table.Column>{t("common.addedBy")}</Table.Column>
+          <Table.Column>{t("transactions.type")}</Table.Column>
+          {column("category", t("expenses.category"), true)}
+          {column("date", t("common.date"))}
+          {column("amount", t("transactions.amount"))}
+          <Table.Column>{t("expenses.note")}</Table.Column>
+          {editable && <Table.Column aria-label={t("common.edit")}> </Table.Column>}
+        </>
+      }
+    >
+      {sorted.map(e => {
+        const income = kindOf(categories, e.categoryId) === "income";
+        return (
+          <Table.Row key={e.id} id={e.id} className={editingRow(e.id === editingId)}>
+            {showGroup && <Table.Cell>{nameOf(groups, e.groupId)}</Table.Cell>}
+            <Table.Cell>{addedBy(members, e.userId, t)}</Table.Cell>
+            <Table.Cell>
+              <Chip size="sm" color={income ? "success" : "danger"} variant="soft">
+                {t(income ? "type.income" : "type.expense")}
+              </Chip>
+            </Table.Cell>
+            <Table.Cell>{categoryName(t, e.categoryId)}</Table.Cell>
+            <Table.Cell className="whitespace-nowrap">{e.date}</Table.Cell>
+            <Table.Cell>
+              <Money cents={signedEntry(categories, e)} format={formatCents} signed />
+            </Table.Cell>
+            <Table.Cell className="text-muted">{e.note}</Table.Cell>
+            {editable && (
+              <Table.Cell>
+                <RowActions onEdit={() => onEdit!(e)} onDelete={() => onDelete!(e)} />
+              </Table.Cell>
+            )}
+          </Table.Row>
+        );
+      })}
+    </DataTable>
   );
 }

@@ -3,6 +3,8 @@ import { api, call, text, type JsonRequest } from "@client/api";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { categoryKinds } from "@shared/expenses";
+import { Button, Chip, Switch, Table } from "@heroui/react";
+import { DataTable, Field, FormGrid, Message, Section, SelectField } from "@client/components/ui";
 import type { Category, CategoryKind } from "@arthurzakharov/family-budget-be-client";
 
 // Admin only: show or hide categories, and create new ones in either list.
@@ -43,65 +45,64 @@ export function Categories() {
     }
   };
 
-  const list = (kind: CategoryKind) => (
-    <>
-      <h3>{t(kind === "income" ? "expenses.incomeCategories" : "expenses.expenseCategories")}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>{t("expenses.visible")}</th>
-            <th>{t("expenses.category")}</th>
-          </tr>
-        </thead>
-        <tbody>
+  const list = (kind: CategoryKind) => {
+    const title = t(kind === "income" ? "expenses.incomeCategories" : "expenses.expenseCategories");
+    return (
+      <Section title={title}>
+        <DataTable
+          label={title}
+          columns={
+            <>
+              <Table.Column isRowHeader>{t("expenses.category")}</Table.Column>
+              <Table.Column className="w-24">{t("expenses.visible")}</Table.Column>
+            </>
+          }
+        >
           {categories
             .filter(c => c.kind === kind)
             .map(c => (
-              <tr key={c.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={categoryName(t, c.id)}
-                    checked={!c.hidden}
-                    onChange={e => toggle(c, e.target.checked)}
-                  />
-                </td>
-                <td>
-                  {categoryName(t, c.id)}
-                  {c.name !== null && <small> ({t("expenses.custom")})</small>}
-                </td>
-              </tr>
+              <Table.Row key={c.id} id={c.id}>
+                <Table.Cell>
+                  <span className={c.hidden ? "text-muted line-through" : ""}>{categoryName(t, c.id)}</span>
+                  {c.name !== null && (
+                    <Chip size="sm" variant="soft" className="ml-2">
+                      {t("expenses.custom")}
+                    </Chip>
+                  )}
+                </Table.Cell>
+                <Table.Cell>
+                  <Switch aria-label={categoryName(t, c.id)} isSelected={!c.hidden} onChange={visible => toggle(c, visible)}>
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch>
+                </Table.Cell>
+              </Table.Row>
             ))}
-        </tbody>
-      </table>
-    </>
-  );
+        </DataTable>
+      </Section>
+    );
+  };
 
   return (
     <>
-      <h2>{t("expenses.categories")}</h2>
-      <p>{t("expenses.categoriesHint")}</p>
-      <form onSubmit={onCreate} className="transaction-form">
-        <label>
-          {t("expenses.categoryName")}
-          <input type="text" name="name" required />
-        </label>
-        <label>
-          {t("expenses.list")}
-          <select name="kind" required defaultValue="expense">
-            {categoryKinds.map(k => (
-              <option key={k} value={k}>
-                {t(k === "income" ? "type.income" : "type.expense")}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">{t("expenses.createCategory")}</button>
-      </form>
-      {notice && <p className="success">{t(notice)}</p>}
-      {error && <p className="error">{t(error)}</p>}
-      {list("expense")}
-      {list("income")}
+      <Section title={t("expenses.createCategory")} description={t("expenses.categoriesHint")}>
+        <Message error={error} success={notice} />
+        <FormGrid onSubmit={onCreate} actions={<Button type="submit">{t("expenses.createCategory")}</Button>}>
+          <Field label={t("expenses.categoryName")} type="text" name="name" required />
+          <SelectField
+            label={t("expenses.list")}
+            name="kind"
+            isRequired
+            defaultValue="expense"
+            options={categoryKinds.map(k => ({ id: k, label: t(k === "income" ? "type.income" : "type.expense") }))}
+          />
+        </FormGrid>
+      </Section>
+      <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
+        {list("expense")}
+        {list("income")}
+      </div>
     </>
   );
 }

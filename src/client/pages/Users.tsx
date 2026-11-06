@@ -4,6 +4,8 @@ import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { RoleAndGroupFields } from "@client/components/users/RoleAndGroupFields";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
+import { Button, Chip, Input, Table } from "@heroui/react";
+import { DataTable, editingRow, Field, FormGrid, Message, PageHeader, RowActions, Section } from "@client/components/ui";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
 // The role and groups picked in RoleAndGroupFields. The backend rejects any other role.
@@ -84,95 +86,108 @@ export function Users() {
 
   return (
     <>
-      <h1>{t("nav.users")}</h1>
+      <PageHeader title={t("nav.users")} />
 
-      <h2>{t("users.create")}</h2>
-      {groups?.length === 0 && <p>{t("users.noGroupsHint")}</p>}
-      {/* A user must belong to a group, so the form is disabled until one exists. */}
-      <form onSubmit={onCreate} className="transaction-form">
-        <fieldset disabled={!groups?.length} className="plain-fieldset">
-          <label>
-            {t("users.name")}
-            <input type="text" name="name" required />
-          </label>
-          <label>
-            {t("auth.password")}
-            <input type="password" name="password" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
-          </label>
-          <RoleAndGroupFields groups={groups ?? []} />
-          <button type="submit">{t("users.create")}</button>
+      <Section title={t("users.create")} description={groups?.length === 0 ? t("users.noGroupsHint") : undefined}>
+        {/* A user must belong to a group, so the form is disabled until one exists. */}
+        <fieldset disabled={!groups?.length} className="min-w-0">
+          <FormGrid onSubmit={onCreate} actions={<Button type="submit">{t("users.create")}</Button>}>
+            <Field label={t("users.name")} type="text" name="name" required />
+            <Field
+              label={t("auth.password")}
+              type="password"
+              name="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+            />
+            <RoleAndGroupFields groups={groups ?? []} />
+          </FormGrid>
         </fieldset>
-      </form>
+      </Section>
 
-      {error && <p className="error">{t(error)}</p>}
-      {message && <p className="success">{t(message)}</p>}
+      <Message error={error} success={message} />
 
-      <table>
-        <thead>
-          <tr>
-            <th>{t("users.name")}</th>
-            <th>{t("users.role")}</th>
-            <th>{t("users.groups")}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
+      <Section>
+        <DataTable
+          label={t("nav.users")}
+          columns={
+            <>
+              <Table.Column isRowHeader>{t("users.name")}</Table.Column>
+              <Table.Column>{t("users.role")}</Table.Column>
+              <Table.Column>{t("users.groups")}</Table.Column>
+              <Table.Column aria-label={t("common.edit")}> </Table.Column>
+            </>
+          }
+        >
           {users.map(u => (
-            <tr key={u.id}>
-              <td>
-                {u.name}
-                {u.id === me.id && ` (${t("users.you")})`}
-              </td>
-              <td>{t(`role.${u.role}`)}</td>
-              <td>{groupNames(u)}</td>
-              <td>
+            <Table.Row key={u.id} id={u.id} className={editingRow(editing?.id === u.id)}>
+              <Table.Cell>
+                <span className="font-medium">{u.name}</span>
+                {u.id === me.id && <span className="text-muted"> ({t("users.you")})</span>}
+              </Table.Cell>
+              <Table.Cell>
+                <Chip size="sm" variant="soft" color={u.role === "admin" ? "accent" : "default"}>
+                  {t(`role.${u.role}`)}
+                </Chip>
+              </Table.Cell>
+              <Table.Cell>{groupNames(u)}</Table.Cell>
+              <Table.Cell>
                 {isEditing(u, "password") ? (
-                  <form onSubmit={e => onChangePassword(e, u)} className="inline-form">
-                    <input
+                  <form onSubmit={e => onChangePassword(e, u)} className="flex items-end justify-end gap-2">
+                    <Input
+                      variant="secondary"
+                      className="h-8"
                       type="password"
                       name="password"
                       required
                       minLength={MIN_PASSWORD_LENGTH}
                       autoComplete="new-password"
                       placeholder={t("users.newPassword")}
+                      aria-label={t("users.newPassword")}
                     />
-                    <button type="submit">{t("common.saveChanges")}</button>
-                    <button type="button" onClick={() => setEditing(null)}>
+                    <Button size="sm" type="submit">
+                      {t("common.saveChanges")}
+                    </Button>
+                    <Button size="sm" variant="secondary" onPress={() => setEditing(null)}>
                       {t("common.cancel")}
-                    </button>
+                    </Button>
                   </form>
                 ) : isEditing(u, "roleAndGroups") ? (
-                  <form onSubmit={e => onChangeRoleAndGroups(e, u)} className="inline-form">
+                  <form onSubmit={e => onChangeRoleAndGroups(e, u)} className="flex min-w-64 flex-col gap-3">
                     <RoleAndGroupFields groups={groups ?? []} user={u} />
-                    <button type="submit">{t("common.saveChanges")}</button>
-                    <button type="button" onClick={() => setEditing(null)}>
-                      {t("common.cancel")}
-                    </button>
+                    <div className="flex gap-2">
+                      <Button size="sm" type="submit">
+                        {t("common.saveChanges")}
+                      </Button>
+                      <Button size="sm" variant="secondary" onPress={() => setEditing(null)}>
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
                   </form>
                 ) : (
-                  <>
-                    <button type="button" onClick={() => setEditing({ id: u.id, field: "password" })}>
-                      {t("users.changePassword")}
-                    </button>
-                    {/* The admin's role and groups are fixed, and the admin cannot be deleted. */}
-                    {u.role !== "admin" && (
+                  <RowActions
+                    // The admin's role and groups are fixed, and the admin cannot be deleted.
+                    onDelete={u.role !== "admin" ? () => onDelete(u) : undefined}
+                    extra={
                       <>
-                        {" "}
-                        <button type="button" onClick={() => setEditing({ id: u.id, field: "roleAndGroups" })}>
-                          {t("users.editRoleAndGroups")}
-                        </button>{" "}
-                        <button type="button" onClick={() => onDelete(u)}>
-                          {t("common.delete")}
-                        </button>
+                        <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "password" })}>
+                          {t("users.changePassword")}
+                        </Button>
+                        {u.role !== "admin" && (
+                          <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "roleAndGroups" })}>
+                            {t("users.editRoleAndGroups")}
+                          </Button>
+                        )}
                       </>
-                    )}
-                  </>
+                    }
+                  />
                 )}
-              </td>
-            </tr>
+              </Table.Cell>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
+        </DataTable>
+      </Section>
     </>
   );
 }

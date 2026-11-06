@@ -4,6 +4,7 @@ import { useI18n } from "@client/context/i18n";
 import { useCrypto } from "@client/context/crypto";
 import { CryptoTransactionForm } from "@client/components/crypto/CryptoTransactionForm";
 import { CryptoTransactionTable } from "@client/components/crypto/CryptoTransactionTable";
+import { Message, Section } from "@client/components/ui";
 import type { CryptoTransaction } from "@arthurzakharov/family-budget-be-client";
 
 // Adding, editing and deleting buys and sells. Only for admins and contributors,
@@ -47,27 +48,30 @@ export function Manage() {
 
   return (
     <>
-      <h2>{t("transactions.title")}</h2>
-      {/* The key remounts the form so it empties after adding and follows the record being edited. */}
-      <CryptoTransactionForm
-        key={`crypto-${editing?.id ?? `new-${transactions.length}`}`}
-        editing={editing}
-        groups={groups}
-        members={members}
-        coins={coins}
-        onSaved={onSaved}
-        onCancel={() => edit(null)}
-      />
-      {notice && <p className="success">{t(notice)}</p>}
-      {deleteError && <p className="error">{t(deleteError)}</p>}
-      <CryptoTransactionTable
-        transactions={transactions}
-        groups={groups}
-        members={members}
-        onEdit={edit}
-        onDelete={onDelete}
-        editingId={editing?.id}
-      />
+      <Section title={editing ? t("common.edit") : t("transactions.add")}>
+        <Message success={notice} />
+        {/* The key remounts the form so it empties after adding and follows the record being edited. */}
+        <CryptoTransactionForm
+          key={`crypto-${editing?.id ?? `new-${transactions.length}`}`}
+          editing={editing}
+          groups={groups}
+          members={members}
+          coins={coins}
+          onSaved={onSaved}
+          onCancel={() => edit(null)}
+        />
+      </Section>
+      <Section title={t("transactions.title")}>
+        <Message error={deleteError} />
+        <CryptoTransactionTable
+          transactions={transactions}
+          groups={groups}
+          members={members}
+          onEdit={edit}
+          onDelete={onDelete}
+          editingId={editing?.id}
+        />
+      </Section>
     </>
   );
 }

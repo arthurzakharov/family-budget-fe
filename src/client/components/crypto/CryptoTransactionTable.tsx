@@ -1,8 +1,10 @@
+import { Chip, Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { hasSeveralGroups } from "@client/utils/access";
 import { useSort } from "@client/utils/sort";
 import { addedBy, formatCoins, formatMoney, nameOf } from "@client/utils/format";
+import { DataTable, editingRow, Money, RowActions } from "@client/components/ui";
 import { signedCoins, signedMoney } from "@shared/crypto";
 import type { CryptoTransaction, Group, Member } from "@arthurzakharov/family-budget-be-client";
 
@@ -30,53 +32,55 @@ export function CryptoTransactionTable({ transactions, groups, members, onEdit, 
     if (key === "coin") return a.coin.localeCompare(b.coin);
     return a.date.localeCompare(b.date);
   };
-  const { sorted, header: sortable } = useSort(transactions, compare);
+  const { sorted, column, sortProps } = useSort(transactions, compare);
 
   return (
-    <table>
-      <thead>
-        <tr>
-          {showGroup && sortable("group", t("transactions.group"))}
-          <th>{t("common.addedBy")}</th>
-          {sortable("coin", t("crypto.coin"))}
-          <th>{t("transactions.type")}</th>
-          {sortable("date", t("common.date"))}
-          <th>{t("crypto.amount")}</th>
-          <th>{t("crypto.rate")}</th>
-          {sortable("money", t("crypto.money"))}
-          {editable && <th></th>}
-        </tr>
-      </thead>
-      <tbody>
-        {transactions.length === 0 ? (
-          <tr>
-            <td colSpan={7 + (showGroup ? 1 : 0) + (editable ? 1 : 0)}>{t("transactions.empty")}</td>
-          </tr>
-        ) : (
-          sorted.map(tx => (
-            <tr key={tx.id} className={tx.id === editingId ? "editing" : ""}>
-              {showGroup && <td>{nameOf(groups, tx.groupId)}</td>}
-              <td>{addedBy(members, tx.userId, t)}</td>
-              <td>{tx.coin}</td>
-              <td>{t(tx.type === "sell" ? "type.sell" : "type.buy")}</td>
-              <td>{tx.date}</td>
-              <td>{formatCoins(signedCoins(tx))}</td>
-              <td>{formatMoney(tx.price)}</td>
-              <td>{formatMoney(signedMoney(tx))}</td>
-              {editable && (
-                <td>
-                  <button type="button" onClick={() => onEdit!(tx)}>
-                    {t("common.edit")}
-                  </button>{" "}
-                  <button type="button" onClick={() => onDelete!(tx)}>
-                    {t("common.delete")}
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
+    <DataTable
+      label={t("transactions.title")}
+      emptyText={t("transactions.empty")}
+      {...sortProps}
+      columns={
+        <>
+          {showGroup && column("group", t("transactions.group"))}
+          <Table.Column>{t("common.addedBy")}</Table.Column>
+          {column("coin", t("crypto.coin"), true)}
+          <Table.Column>{t("transactions.type")}</Table.Column>
+          {column("date", t("common.date"))}
+          <Table.Column>{t("crypto.amount")}</Table.Column>
+          <Table.Column>{t("crypto.rate")}</Table.Column>
+          {column("money", t("crypto.money"))}
+          {editable && <Table.Column aria-label={t("common.edit")}> </Table.Column>}
+        </>
+      }
+    >
+      {sorted.map(tx => {
+        const sell = tx.type === "sell";
+        return (
+          <Table.Row key={tx.id} id={tx.id} className={editingRow(tx.id === editingId)}>
+            {showGroup && <Table.Cell>{nameOf(groups, tx.groupId)}</Table.Cell>}
+            <Table.Cell>{addedBy(members, tx.userId, t)}</Table.Cell>
+            <Table.Cell className="font-medium">{tx.coin}</Table.Cell>
+            <Table.Cell>
+              <Chip size="sm" color={sell ? "danger" : "success"} variant="soft">
+                {t(sell ? "type.sell" : "type.buy")}
+              </Chip>
+            </Table.Cell>
+            <Table.Cell className="whitespace-nowrap">{tx.date}</Table.Cell>
+            <Table.Cell className="tabular-nums">{formatCoins(signedCoins(tx))}</Table.Cell>
+            <Table.Cell>
+              <Money cents={tx.price} format={formatMoney} />
+            </Table.Cell>
+            <Table.Cell>
+              <Money cents={signedMoney(tx)} format={formatMoney} signed />
+            </Table.Cell>
+            {editable && (
+              <Table.Cell>
+                <RowActions onEdit={() => onEdit!(tx)} onDelete={() => onDelete!(tx)} />
+              </Table.Cell>
+            )}
+          </Table.Row>
+        );
+      })}
+    </DataTable>
   );
 }

@@ -27,8 +27,8 @@ import { canEdit } from "@shared/roles";
 import { Settings } from "@client/pages/Settings";
 import { Users } from "@client/pages/Users";
 import { Groups } from "@client/pages/Groups";
-import { Login } from "@client/pages/Login";
-import { ChooseUser } from "@client/pages/ChooseUser";
+import { Login } from "@client/pages/login/Login";
+import { ChooseUser } from "@client/pages/login/ChooseUser";
 import type { AuthStatus } from "@arthurzakharov/family-budget-be-client";
 
 // The router reads who is logged in from here; App passes the current auth status in.

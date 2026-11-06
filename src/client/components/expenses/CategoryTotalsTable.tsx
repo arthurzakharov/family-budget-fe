@@ -1,5 +1,7 @@
+import { Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
+import { DataTable, Money } from "@client/components/ui";
 import { formatCents } from "@client/utils/format";
 import { kindOf, type EntrySummary } from "@shared/expenses";
 import type { CategoryKind } from "@arthurzakharov/family-budget-be-client";
@@ -15,40 +17,41 @@ export function CategoryTotalsTable({ summary }: { summary: EntrySummary }) {
       .filter(([id]) => kindOf(categories, id) === kind)
       .sort(([, a], [, b]) => b - a)
       .map(([id, amount]) => (
-        <tr key={id}>
-          <td>{categoryName(t, id)}</td>
-          <td>{formatCents(amount)}</td>
-        </tr>
+        <Table.Row key={`${kind}-${id}`} id={`${kind}-${id}`}>
+          <Table.Cell className="pl-6">{categoryName(t, id)}</Table.Cell>
+          <Table.Cell>
+            <Money cents={amount} format={formatCents} />
+          </Table.Cell>
+        </Table.Row>
       ));
 
-  const section = (kind: CategoryKind, total: number) => (
-    <>
-      <tr>
-        <th>{t(kind === "income" ? "expenses.income" : "expenses.expenses")}</th>
-        <th>{formatCents(total)}</th>
-      </tr>
-      {rows(kind)}
-    </>
+  // A bold subtotal row heading each list.
+  const total = (id: string, label: string, cents: number, signed?: boolean) => (
+    <Table.Row key={id} id={id} className="[&>td]:font-semibold">
+      <Table.Cell>{label}</Table.Cell>
+      <Table.Cell>
+        <Money cents={cents} format={formatCents} signed={signed} />
+      </Table.Cell>
+    </Table.Row>
   );
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>{t("expenses.category")}</th>
-          <th>{t("transactions.amount")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {section("income", summary.income)}
-        {section("expense", summary.expenses)}
-      </tbody>
-      <tfoot>
-        <tr>
-          <th>{t("expenses.net")}</th>
-          <td>{formatCents(summary.net)}</td>
-        </tr>
-      </tfoot>
-    </table>
+    <DataTable
+      label={t("expenses.byCategory")}
+      columns={
+        <>
+          <Table.Column isRowHeader>{t("expenses.category")}</Table.Column>
+          <Table.Column>{t("transactions.amount")}</Table.Column>
+        </>
+      }
+    >
+      {[
+        total("income", t("expenses.income"), summary.income),
+        ...rows("income"),
+        total("expense", t("expenses.expenses"), summary.expenses),
+        ...rows("expense"),
+        total("net", t("expenses.net"), summary.net, true),
+      ]}
+    </DataTable>
   );
 }

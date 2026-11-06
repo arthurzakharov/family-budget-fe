@@ -1,14 +1,22 @@
 import { languages, useI18n, type Language } from "@client/context/i18n";
-import { themes, useTheme } from "@client/context/theme";
+import { themes, useTheme, type Theme } from "@client/context/theme";
 import { useAuth, useCurrentUser } from "@client/context/auth";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
 import { api, call, text } from "@client/api";
 import { useState, type FormEvent } from "react";
+import { Avatar, Button, ToggleButton, ToggleButtonGroup, type Key } from "@heroui/react";
+import { Field, FormStack, Message, PageHeader, Section } from "@client/components/ui";
 
 // Language names are shown in their own language, so they are not translated.
 const languageNames: Record<Language, string> = {
   en: "English",
   ru: "Русский",
+};
+
+// The single key picked in a single-selection ToggleButtonGroup.
+const picked = (keys: Set<Key>) => {
+  const [key] = keys;
+  return key === undefined ? null : String(key);
 };
 
 export function Settings() {
@@ -31,55 +39,84 @@ export function Settings() {
 
   return (
     <>
-      <h1>{t("nav.settings")}</h1>
+      <PageHeader title={t("nav.settings")} />
 
-      <fieldset className="settings-group">
-        <legend>{t("settings.account")}</legend>
-        <p>{t("settings.loggedInAs", { name: user.name, role: t(`role.${user.role}`) })}</p>
-        <button type="button" onClick={() => send(api.auth["switch-user"].$post())}>
-          {t("settings.switchUser")}
-        </button>
-        <button type="button" onClick={() => send(api.auth.logout.$post())}>
-          {t("auth.logout")}
-        </button>
-      </fieldset>
+      <div className="grid items-start gap-6 md:grid-cols-2 [&>*]:min-w-0">
+        <Section title={t("settings.account")} className="mb-0">
+          <div className="mb-4 flex items-center gap-3">
+            <Avatar>
+              <Avatar.Fallback>{user.name.slice(0, 2).toUpperCase()}</Avatar.Fallback>
+            </Avatar>
+            <p className="text-sm">{t("settings.loggedInAs", { name: user.name, role: t(`role.${user.role}`) })}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onPress={() => send(api.auth["switch-user"].$post())}>
+              {t("settings.switchUser")}
+            </Button>
+            <Button variant="danger-soft" onPress={() => send(api.auth.logout.$post())}>
+              {t("auth.logout")}
+            </Button>
+          </div>
+        </Section>
 
-      <fieldset className="settings-group">
-        <legend>{t("settings.changePassword")}</legend>
-        <form onSubmit={onChangePassword} className="transaction-form">
-          <label>
-            {t("settings.currentPassword")}
-            <input type="password" name="current" required autoComplete="current-password" />
-          </label>
-          <label>
-            {t("users.newPassword")}
-            <input type="password" name="next" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
-          </label>
-          <button type="submit">{t("settings.changePassword")}</button>
-          {error && <p className="error">{t(error)}</p>}
-          {changed && <p className="success">{t("users.passwordChanged")}</p>}
-        </form>
-      </fieldset>
+        <Section title={t("settings.changePassword")} className="mb-0">
+          <Message error={error} success={changed ? "users.passwordChanged" : null} />
+          <FormStack onSubmit={onChangePassword}>
+            <Field label={t("settings.currentPassword")} type="password" name="current" required autoComplete="current-password" />
+            <Field
+              label={t("users.newPassword")}
+              type="password"
+              name="next"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+            />
+            <div>
+              <Button type="submit">{t("settings.changePassword")}</Button>
+            </div>
+          </FormStack>
+        </Section>
 
-      <fieldset className="settings-group">
-        <legend>{t("settings.theme")}</legend>
-        {themes.map(th => (
-          <label key={th}>
-            <input type="radio" name="theme" checked={th === theme} onChange={() => setTheme(th)} />
-            {t(`theme.${th}`)}
-          </label>
-        ))}
-      </fieldset>
+        <Section title={t("settings.theme")} className="mb-0">
+          <ToggleButtonGroup
+            aria-label={t("settings.theme")}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[theme]}
+            onSelectionChange={keys => {
+              const th = picked(keys);
+              if (th) setTheme(th as Theme);
+            }}
+          >
+            {themes.map((th, i) => (
+              <ToggleButton key={th} id={th}>
+                {i > 0 && <ToggleButtonGroup.Separator />}
+                {t(`theme.${th}`)}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Section>
 
-      <fieldset className="settings-group">
-        <legend>{t("settings.language")}</legend>
-        {(Object.keys(languages) as Language[]).map(l => (
-          <label key={l}>
-            <input type="radio" name="language" checked={l === language} onChange={() => setLanguage(l)} />
-            {languageNames[l]}
-          </label>
-        ))}
-      </fieldset>
+        <Section title={t("settings.language")} className="mb-0">
+          <ToggleButtonGroup
+            aria-label={t("settings.language")}
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[language]}
+            onSelectionChange={keys => {
+              const l = picked(keys);
+              if (l) setLanguage(l as Language);
+            }}
+          >
+            {(Object.keys(languages) as Language[]).map((l, i) => (
+              <ToggleButton key={l} id={l}>
+                {i > 0 && <ToggleButtonGroup.Separator />}
+                {languageNames[l]}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Section>
+      </div>
     </>
   );
 }

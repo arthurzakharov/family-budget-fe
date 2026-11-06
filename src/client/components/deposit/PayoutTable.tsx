@@ -1,4 +1,6 @@
+import { Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
+import { DataTable, Money } from "@client/components/ui";
 import { formatCents, nameOf } from "@client/utils/format";
 import type { Group, InterestSummary } from "@arthurzakharov/family-budget-be-client";
 
@@ -13,53 +15,52 @@ export function PayoutTable({ interest, groups }: Props) {
   // Groups in the order they were created, plus any only known from transactions.
   const groupIds = Object.keys(interest.byGroup);
   const groupColumns = groupIds.length > 1 ? groupIds : [];
+  const money = (cents: number) => <Money cents={cents} format={formatCents} />;
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>{t("common.date")}</th>
-          <th>{t("payouts.beforeTax")}</th>
-          <th>{t("common.tax")}</th>
-          <th>{t("payouts.afterTax")}</th>
+    <DataTable
+      label={t("payouts.title")}
+      emptyText={t("payouts.empty")}
+      columns={
+        <>
+          <Table.Column isRowHeader>{t("common.date")}</Table.Column>
+          <Table.Column>{t("payouts.beforeTax")}</Table.Column>
+          <Table.Column>{t("common.tax")}</Table.Column>
+          <Table.Column>{t("payouts.afterTax")}</Table.Column>
           {groupColumns.map(id => (
-            <th key={id}>{t("payouts.groupAfterTax", { group: nameOf(groups, id) })}</th>
+            <Table.Column key={id} id={`group-${id}`}>
+              {t("payouts.groupAfterTax", { group: nameOf(groups, id) })}
+            </Table.Column>
           ))}
-          <th>{t("common.balance")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {interest.payouts.length === 0 ? (
-          <tr>
-            <td colSpan={5 + groupColumns.length}>{t("payouts.empty")}</td>
-          </tr>
-        ) : (
-          interest.payouts.map(p => (
-            <tr key={p.date}>
-              <td>{p.date}</td>
-              <td>{formatCents(p.gross)}</td>
-              <td>{formatCents(p.tax)}</td>
-              <td>{formatCents(p.net)}</td>
-              {groupColumns.map(id => (
-                <td key={id}>{formatCents(p.netByGroup[id] ?? 0)}</td>
-              ))}
-              <td>{formatCents(p.balance)}</td>
-            </tr>
-          ))
-        )}
-      </tbody>
-      <tfoot>
-        <tr>
-          <th>{t("common.total")}</th>
-          <td>{formatCents(interest.gross)}</td>
-          <td>{formatCents(interest.tax)}</td>
-          <td>{formatCents(interest.net)}</td>
+          <Table.Column>{t("common.balance")}</Table.Column>
+        </>
+      }
+    >
+      {interest.payouts.map(p => (
+        <Table.Row key={p.date} id={p.date}>
+          <Table.Cell className="whitespace-nowrap">{p.date}</Table.Cell>
+          <Table.Cell>{money(p.gross)}</Table.Cell>
+          <Table.Cell>{money(p.tax)}</Table.Cell>
+          <Table.Cell>{money(p.net)}</Table.Cell>
           {groupColumns.map(id => (
-            <td key={id}>{formatCents(interest.byGroup[id]!.net)}</td>
+            <Table.Cell key={id}>{money(p.netByGroup[id] ?? 0)}</Table.Cell>
           ))}
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
+          <Table.Cell>{money(p.balance)}</Table.Cell>
+        </Table.Row>
+      ))}
+      {/* The total row only makes sense under actual payouts; without any the empty text shows instead. */}
+      {interest.payouts.length > 0 && (
+        <Table.Row key="total" id="total" className="[&>td]:font-semibold">
+          <Table.Cell>{t("common.total")}</Table.Cell>
+          <Table.Cell>{money(interest.gross)}</Table.Cell>
+          <Table.Cell>{money(interest.tax)}</Table.Cell>
+          <Table.Cell>{money(interest.net)}</Table.Cell>
+          {groupColumns.map(id => (
+            <Table.Cell key={id}>{money(interest.byGroup[id]!.net)}</Table.Cell>
+          ))}
+          <Table.Cell> </Table.Cell>
+        </Table.Row>
+      )}
+    </DataTable>
   );
 }

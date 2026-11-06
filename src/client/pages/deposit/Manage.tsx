@@ -7,6 +7,7 @@ import { RateForm } from "@client/components/deposit/RateForm";
 import { RateTable } from "@client/components/deposit/RateTable";
 import { TransactionForm } from "@client/components/deposit/TransactionForm";
 import { TransactionTable } from "@client/components/deposit/TransactionTable";
+import { Message, Section } from "@client/components/ui";
 import type { DepositRate, DepositTransaction } from "@arthurzakharov/family-budget-be-client";
 
 // Adding, editing and deleting rates and transactions. Only for admins and contributors.
@@ -67,37 +68,43 @@ export function Manage() {
 
   return (
     <>
-      <h2>{t("rates.title")}</h2>
-      {/* The keys remount the forms so they empty after adding and follow the record being edited. */}
-      <RateForm
-        key={`rate-${editingRate?.id ?? `new-${rates.length}`}`}
-        editing={editingRate}
-        members={members}
-        onSaved={onRateSaved}
-        onCancel={() => editRate(null)}
-      />
-      {rateNotice && <p className="success">{t(rateNotice)}</p>}
-      <RateTable rates={rates} members={members} onEdit={editRate} editingId={editingRate?.id} />
+      <Section title={editingRate ? t("common.edit") : t("rates.add")}>
+        <Message success={rateNotice} />
+        {/* The keys remount the forms so they empty after adding and follow the record being edited. */}
+        <RateForm
+          key={`rate-${editingRate?.id ?? `new-${rates.length}`}`}
+          editing={editingRate}
+          members={members}
+          onSaved={onRateSaved}
+          onCancel={() => editRate(null)}
+        />
+      </Section>
+      <Section title={t("rates.title")}>
+        <RateTable rates={rates} members={members} onEdit={editRate} editingId={editingRate?.id} />
+      </Section>
 
-      <h2>{t("transactions.title")}</h2>
-      <TransactionForm
-        key={`transaction-${editingTransaction?.id ?? `new-${transactions.length}`}`}
-        editing={editingTransaction}
-        groups={groups}
-        members={members}
-        onSaved={onTransactionSaved}
-        onCancel={() => editTransaction(null)}
-      />
-      {transactionNotice && <p className="success">{t(transactionNotice)}</p>}
-      {deleteError && <p className="error">{t(deleteError)}</p>}
-      <TransactionTable
-        transactions={transactions}
-        groups={groups}
-        members={members}
-        onEdit={editTransaction}
-        onDelete={onDelete}
-        editingId={editingTransaction?.id}
-      />
+      <Section title={editingTransaction ? t("common.edit") : t("transactions.add")}>
+        <Message success={transactionNotice} />
+        <TransactionForm
+          key={`transaction-${editingTransaction?.id ?? `new-${transactions.length}`}`}
+          editing={editingTransaction}
+          groups={groups}
+          members={members}
+          onSaved={onTransactionSaved}
+          onCancel={() => editTransaction(null)}
+        />
+      </Section>
+      <Section title={t("transactions.title")}>
+        <Message error={deleteError} />
+        <TransactionTable
+          transactions={transactions}
+          groups={groups}
+          members={members}
+          onEdit={editTransaction}
+          onDelete={onDelete}
+          editingId={editingTransaction?.id}
+        />
+      </Section>
     </>
   );
 }

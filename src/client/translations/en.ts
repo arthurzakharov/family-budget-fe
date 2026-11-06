@@ -137,6 +137,7 @@ export const en = {
   "common.edit": "Edit",
   "common.delete": "Delete",
   "common.cancel": "Cancel",
+  "common.loading": "Loading…",
   "common.saveChanges": "Save changes",
   "common.date": "Date",
   "common.tax": "Tax",

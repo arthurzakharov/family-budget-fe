@@ -1,0 +1,86 @@
+/*
+ * Workaround for HeroUI soft colours rendering solid (Bun 1.4.2, bun-plugin-tailwind 0.1.2,
+ * @heroui/styles 3.2.7).
+ *
+ * HeroUI defines its soft and hover colours with color-mix(), e.g.
+ *   --success-soft: color-mix(in oklab, var(--success) 15%, transparent);
+ * Tailwind's colour polyfill rewrites each one into a plain fallback (the full, solid colour)
+ * plus an "@supports (color: color-mix(...)) { & { ... } }" block. Bun's CSS bundler keeps
+ * only one such block per rule and drops the rest, so the browser gets the solid fallbacks:
+ * soft chips and alerts turn solid, with text the same colour as their background.
+ *
+ * The values below are copied from node_modules/@heroui/styles/dist/themes/default/variables.css.
+ * They are written as "Color-mix(" on purpose: CSS function names are case-insensitive, but
+ * Tailwind only polyfills the lower-case spelling, so these reach the browser untouched and,
+ * being outside any layer, win over HeroUI's broken fallbacks. Every current browser supports
+ * color-mix(). After upgrading HeroUI, Tailwind or Bun, re-check these, or delete this file
+ * once soft chips render correctly without it.
+ */
+
+:root,
+[data-theme="light"] {
+  --scrollbar-thumb: Color-mix(in oklch, var(--foreground) 15%, transparent);
+  --surface-hover: Color-mix(in oklab, var(--surface) 92%, var(--surface-foreground) 8%);
+  --background-secondary: Color-mix(in oklab, var(--background) 96%, var(--foreground) 4%);
+  --background-tertiary: Color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
+  --default-hover: Color-mix(in oklab, var(--default) 96%, var(--default-foreground) 4%);
+  --accent-hover: Color-mix(in oklab, var(--accent) 90%, var(--accent-foreground) 10%);
+  --success-hover: Color-mix(in oklab, var(--success) 90%, var(--success-foreground) 10%);
+  --warning-hover: Color-mix(in oklab, var(--warning) 90%, var(--warning-foreground) 10%);
+  --danger-hover: Color-mix(in oklab, var(--danger) 90%, var(--danger-foreground) 10%);
+  --field-hover: Color-mix( in oklab, var(--field-background, var(--default)) 90%, var(--field-foreground, var(--foreground)) 2% );
+  --field-border-hover: Color-mix( in oklab, var(--field-border, var(--border)) 88%, var(--field-foreground, var(--foreground)) 10% );
+  --field-border-focus: Color-mix( in oklab, var(--field-border, var(--border)) 74%, var(--field-foreground, var(--foreground)) 22% );
+  --default-soft: Color-mix(in oklab, var(--default) 50%, transparent);
+  --default-soft-hover: Color-mix(in oklab, var(--default) 60%, transparent);
+  --accent-soft: Color-mix(in oklab, var(--accent) 15%, transparent);
+  --accent-soft-foreground: Color-mix(in oklab, var(--accent) 70%, var(--foreground) 30%);
+  --accent-soft-hover: Color-mix(in oklab, var(--accent) 20%, transparent);
+  --danger-soft: Color-mix(in oklab, var(--danger) 15%, transparent);
+  --danger-soft-foreground: Color-mix(in oklab, var(--danger) 70%, var(--foreground) 40%);
+  --danger-soft-hover: Color-mix(in oklab, var(--danger) 20%, transparent);
+  --warning-soft: Color-mix(in oklab, var(--warning) 15%, transparent);
+  --warning-soft-foreground: Color-mix(in oklab, var(--warning) 80%, var(--foreground) 70%);
+  --warning-soft-hover: Color-mix(in oklab, var(--warning) 20%, transparent);
+  --success-soft: Color-mix(in oklab, var(--success) 15%, transparent);
+  --success-soft-foreground: Color-mix(in oklab, var(--success) 80%, var(--foreground) 60%);
+  --success-soft-hover: Color-mix(in oklab, var(--success) 20%, transparent);
+  --separator-secondary: Color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+  --separator-tertiary: Color-mix(in oklab, var(--surface) 81%, var(--surface-foreground) 19%);
+  --border-secondary: Color-mix(in oklab, var(--surface) 78%, var(--surface-foreground) 22%);
+  --border-tertiary: Color-mix(in oklab, var(--surface) 66%, var(--surface-foreground) 34%);
+}
+
+.dark,
+[data-theme="dark"] {
+  --scrollbar-thumb: Color-mix(in oklch, var(--foreground) 15%, transparent);
+  --surface-hover: Color-mix(in oklab, var(--surface) 92%, var(--surface-foreground) 8%);
+  --background-secondary: Color-mix(in oklab, var(--background) 96%, var(--foreground) 4%);
+  --background-tertiary: Color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
+  --default-hover: Color-mix(in oklab, var(--default) 96%, var(--default-foreground) 4%);
+  --accent-hover: Color-mix(in oklab, var(--accent) 90%, var(--accent-foreground) 10%);
+  --success-hover: Color-mix(in oklab, var(--success) 90%, var(--success-foreground) 10%);
+  --warning-hover: Color-mix(in oklab, var(--warning) 90%, var(--warning-foreground) 10%);
+  --danger-hover: Color-mix(in oklab, var(--danger) 90%, var(--danger-foreground) 10%);
+  --field-hover: Color-mix( in oklab, var(--field-background, var(--default)) 90%, var(--field-foreground, var(--foreground)) 2% );
+  --field-border-hover: Color-mix( in oklab, var(--field-border, var(--border)) 88%, var(--field-foreground, var(--foreground)) 10% );
+  --field-border-focus: Color-mix( in oklab, var(--field-border, var(--border)) 74%, var(--field-foreground, var(--foreground)) 22% );
+  --default-soft: Color-mix(in oklab, var(--default) 50%, transparent);
+  --default-soft-hover: Color-mix(in oklab, var(--default) 60%, transparent);
+  --accent-soft: Color-mix(in oklab, var(--accent) 12%, transparent);
+  --accent-soft-foreground: Color-mix(in oklab, var(--accent) 80%, var(--foreground) 30%);
+  --accent-soft-hover: Color-mix(in oklab, var(--accent) 16%, transparent);
+  --danger-soft: Color-mix(in oklab, var(--danger) 15%, transparent);
+  --danger-soft-foreground: Color-mix(in oklab, var(--danger) 80%, var(--foreground) 30%);
+  --danger-soft-hover: Color-mix(in oklab, var(--danger) 20%, transparent);
+  --warning-soft: Color-mix(in oklab, var(--warning) 12%, transparent);
+  --warning-soft-foreground: Color-mix(in oklab, var(--warning) 80%, var(--foreground) 30%);
+  --warning-soft-hover: Color-mix(in oklab, var(--warning) 16%, transparent);
+  --success-soft: Color-mix(in oklab, var(--success) 12%, transparent);
+  --success-soft-foreground: Color-mix(in oklab, var(--success) 80%, var(--foreground) 30%);
+  --success-soft-hover: Color-mix(in oklab, var(--success) 16%, transparent);
+  --separator-secondary: Color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+  --separator-tertiary: Color-mix(in oklab, var(--surface) 81%, var(--surface-foreground) 19%);
+  --border-secondary: Color-mix(in oklab, var(--surface) 78%, var(--surface-foreground) 22%);
+  --border-tertiary: Color-mix(in oklab, var(--surface) 66%, var(--surface-foreground) 34%);
+}

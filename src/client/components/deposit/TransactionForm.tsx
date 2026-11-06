@@ -4,6 +4,8 @@ import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { UserSelect } from "@client/components/UserSelect";
 import { GroupSelect } from "@client/components/GroupSelect";
+import { Button } from "@heroui/react";
+import { Field, FormGrid, Message, SelectField } from "@client/components/ui";
 import type { DepositTransactionType, DepositTransaction, Group, Member } from "@arthurzakharov/family-budget-be-client";
 
 type Props = {
@@ -49,31 +51,44 @@ export function TransactionForm({ editing, groups, members, onSaved, onCancel }:
   };
 
   return (
-    <form onSubmit={onSubmit} className="transaction-form">
-      {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
-      <GroupSelect groups={groups} defaultValue={editing?.groupId} />
-      <label>
-        {t("transactions.type")}
-        <select name="type" required defaultValue={editing?.type ?? "deposit"}>
-          <option value="deposit">{t("type.deposit")}</option>
-          <option value="withdrawal">{t("type.withdrawal")}</option>
-        </select>
-      </label>
-      <label>
-        {t("common.date")}
-        <input type="date" name="date" required defaultValue={editing?.date} />
-      </label>
-      <label>
-        {t("transactions.amount")}
-        <input type="number" name="amount" required min="0.01" step="0.01" defaultValue={editing ? editing.amountCents / 100 : undefined} />
-      </label>
-      <button type="submit">{editing ? t("common.saveChanges") : t("transactions.add")}</button>
-      {editing && (
-        <button type="button" onClick={onCancel}>
-          {t("common.cancel")}
-        </button>
-      )}
-      {error && <p className="error">{t(error)}</p>}
-    </form>
+    <>
+      <Message error={error} />
+      <FormGrid
+        onSubmit={onSubmit}
+        actions={
+          <>
+            <Button type="submit">{editing ? t("common.saveChanges") : t("transactions.add")}</Button>
+            {editing && (
+              <Button variant="secondary" onPress={onCancel}>
+                {t("common.cancel")}
+              </Button>
+            )}
+          </>
+        }
+      >
+        {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
+        <GroupSelect groups={groups} defaultValue={editing?.groupId} />
+        <SelectField
+          label={t("transactions.type")}
+          name="type"
+          isRequired
+          defaultValue={editing?.type ?? "deposit"}
+          options={[
+            { id: "deposit", label: t("type.deposit") },
+            { id: "withdrawal", label: t("type.withdrawal") },
+          ]}
+        />
+        <Field label={t("common.date")} type="date" name="date" required defaultValue={editing?.date} />
+        <Field
+          label={t("transactions.amount")}
+          type="number"
+          name="amount"
+          required
+          min="0.01"
+          step="0.01"
+          defaultValue={editing ? editing.amountCents / 100 : undefined}
+        />
+      </FormGrid>
+    </>
   );
 }

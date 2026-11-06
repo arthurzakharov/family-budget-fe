@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { Chip, Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { hasSeveralGroups } from "@client/utils/access";
+import { useSort } from "@client/utils/sort";
 import { addedBy, formatCents, formatMoney, nameOf } from "@client/utils/format";
+import { DataTable, editingRow, Money, RowActions } from "@client/components/ui";
 import { signedAmount } from "@shared/transactions";
 import { CAPITAL_GAINS_TAX, SOLIDARITY_SURCHARGE } from "@shared/interest";
 import type { DepositTransaction, Group, Member } from "@arthurzakharov/family-budget-be-client";
 
 type SortKey = "group" | "date" | "amount";
-type Sort = { key: SortKey; dir: "asc" | "desc" };
 
 // Interest figures for the footer, in cents: the whole deposit's or one group's.
 export type Totals = { gross: number; tax: number; net: number; balance: number; pending: number };
@@ -31,24 +32,13 @@ export function TransactionTable({ transactions, groups, members, totals, onEdit
   // A user in one group always sees that group, so the column would say nothing.
   const showGroup = hasSeveralGroups(useCurrentUser());
   const editable = onEdit !== undefined && onDelete !== undefined;
-  const [sort, setSort] = useState<Sort | null>(null);
-
-  // First click sorts ascending, next click flips the direction.
-  const toggleSort = (key: SortKey) => {
-    setSort(sort?.key === key && sort.dir === "asc" ? { key, dir: "desc" } : { key, dir: "asc" });
-  };
-
-  const sortArrow = (key: SortKey) => (sort?.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
 
   const compare = (a: DepositTransaction, b: DepositTransaction, key: SortKey) => {
     if (key === "amount") return signedAmount(a) - signedAmount(b);
     if (key === "group") return nameOf(groups, a.groupId).localeCompare(nameOf(groups, b.groupId));
     return a.date.localeCompare(b.date);
   };
-
-  const sorted = sort
-    ? [...transactions].sort((a, b) => compare(a, b, sort.key) * (sort.dir === "asc" ? 1 : -1))
-    : transactions;
+  const { sorted, column, sortProps } = useSort(transactions, compare);
 
   const totalDeposited = transactions.reduce((sum, t) => sum + (t.type === "withdrawal" ? 0 : t.amountCents), 0);
   const totalWithdrawn = transactions.reduce((sum, t) => sum + (t.type === "withdrawal" ? t.amountCents : 0), 0);
@@ -56,78 +46,71 @@ export function TransactionTable({ transactions, groups, members, totals, onEdit
   const interestPercent = totals && totalAdded > 0 ? (totals.net / totalAdded) * 100 : 0;
 
   // Footer rows: the label spans the data columns, the value the rest.
-  const totalRow = (label: string, value: string) => (
-    <tr>
-      <th colSpan={showGroup ? 4 : 3}>{label}</th>
-      <td colSpan={editable ? 2 : 1}>{value}</td>
-    </tr>
+  const totalRow = (id: string, label: string, value: string) => (
+    <Table.Row key={id} id={id} className="[&>td]:font-semibold">
+      <Table.Cell colSpan={showGroup ? 4 : 3}>{label}</Table.Cell>
+      <Table.Cell colSpan={editable ? 2 : 1} className="tabular-nums">
+        {value}
+      </Table.Cell>
+    </Table.Row>
   );
 
   return (
-    <table>
-      <thead>
-        <tr>
-          {showGroup && (
-            <th className="sortable" onClick={() => toggleSort("group")}>
-              {t("transactions.group")}
-              {sortArrow("group")}
-            </th>
-          )}
-          <th>{t("common.addedBy")}</th>
-          <th>{t("transactions.type")}</th>
-          <th className="sortable" onClick={() => toggleSort("date")}>
-            {t("common.date")}
-            {sortArrow("date")}
-          </th>
-          <th className="sortable" onClick={() => toggleSort("amount")}>
-            {t("transactions.amount")}
-            {sortArrow("amount")}
-          </th>
-          {editable && <th></th>}
-        </tr>
-      </thead>
-      <tbody>
-        {transactions.length === 0 ? (
-          <tr>
-            <td colSpan={4 + (showGroup ? 1 : 0) + (editable ? 1 : 0)}>{t("transactions.empty")}</td>
-          </tr>
-        ) : (
-          sorted.map(tx => (
-            <tr key={tx.id} className={tx.id === editingId ? "editing" : ""}>
-              {showGroup && <td>{nameOf(groups, tx.groupId)}</td>}
-              <td>{addedBy(members, tx.userId, t)}</td>
-              <td>{t(tx.type === "withdrawal" ? "type.withdrawal" : "type.deposit")}</td>
-              <td>{tx.date}</td>
-              <td>{formatCents(signedAmount(tx))}</td>
-              {editable && (
-                <td>
-                  <button type="button" onClick={() => onEdit!(tx)}>
-                    {t("common.edit")}
-                  </button>{" "}
-                  <button type="button" onClick={() => onDelete!(tx)}>
-                    {t("common.delete")}
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))
-        )}
-      </tbody>
-      {totals && (
-        <tfoot>
-          {totalRow(t("totals.deposited"), formatCents(totalDeposited))}
-          {totalRow(t("totals.withdrawn"), formatCents(totalWithdrawn))}
-          {totalRow(t("totals.netAdded"), formatCents(totalAdded))}
-          {totalRow(t("totals.interestBeforeTax"), formatCents(totals.gross))}
+    <DataTable
+      label={t("transactions.title")}
+      emptyText={t("transactions.empty")}
+      {...sortProps}
+      columns={
+        <>
+          {showGroup && column("group", t("transactions.group"))}
+          <Table.Column>{t("common.addedBy")}</Table.Column>
+          <Table.Column>{t("transactions.type")}</Table.Column>
+          {column("date", t("common.date"), true)}
+          {column("amount", t("transactions.amount"))}
+          {editable && <Table.Column aria-label={t("common.edit")}> </Table.Column>}
+        </>
+      }
+    >
+      {sorted.map(tx => {
+        const withdrawal = tx.type === "withdrawal";
+        return (
+          <Table.Row key={tx.id} id={tx.id} className={editingRow(tx.id === editingId)}>
+            {showGroup && <Table.Cell>{nameOf(groups, tx.groupId)}</Table.Cell>}
+            <Table.Cell>{addedBy(members, tx.userId, t)}</Table.Cell>
+            <Table.Cell>
+              <Chip size="sm" color={withdrawal ? "danger" : "success"} variant="soft">
+                {t(withdrawal ? "type.withdrawal" : "type.deposit")}
+              </Chip>
+            </Table.Cell>
+            <Table.Cell className="whitespace-nowrap">{tx.date}</Table.Cell>
+            <Table.Cell>
+              <Money cents={signedAmount(tx)} format={formatCents} signed />
+            </Table.Cell>
+            {editable && (
+              <Table.Cell>
+                <RowActions onEdit={() => onEdit!(tx)} onDelete={() => onDelete!(tx)} />
+              </Table.Cell>
+            )}
+          </Table.Row>
+        );
+      })}
+      {/* Totals only follow actual transactions; without any the empty text shows instead. */}
+      {totals && transactions.length > 0 && (
+        <>
+          {totalRow("deposited", t("totals.deposited"), formatCents(totalDeposited))}
+          {totalRow("withdrawn", t("totals.withdrawn"), formatCents(totalWithdrawn))}
+          {totalRow("netAdded", t("totals.netAdded"), formatCents(totalAdded))}
+          {totalRow("gross", t("totals.interestBeforeTax"), formatCents(totals.gross))}
           {totalRow(
+            "tax",
             t("totals.taxWithheld", { capitalGains: CAPITAL_GAINS_TAX * 100, surcharge: SOLIDARITY_SURCHARGE * 100 }),
             formatCents(totals.tax),
           )}
-          {totalRow(t("totals.interestAfterTax"), `${formatCents(totals.net)} (${formatMoney(interestPercent)}%)`)}
-          {totalRow(t("totals.balance"), formatCents(totals.balance))}
-          {totalRow(t("totals.pending"), formatCents(totals.pending))}
-        </tfoot>
+          {totalRow("net", t("totals.interestAfterTax"), `${formatCents(totals.net)} (${formatMoney(interestPercent)}%)`)}
+          {totalRow("balance", t("totals.balance"), formatCents(totals.balance))}
+          {totalRow("pending", t("totals.pending"), formatCents(totals.pending))}
+        </>
       )}
-    </table>
+    </DataTable>
   );
 }

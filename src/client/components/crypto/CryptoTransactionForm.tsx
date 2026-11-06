@@ -4,6 +4,8 @@ import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { UserSelect } from "@client/components/UserSelect";
 import { GroupSelect } from "@client/components/GroupSelect";
+import { Button } from "@heroui/react";
+import { Field, FormGrid, Message, SelectField } from "@client/components/ui";
 import { coinName } from "@shared/crypto";
 import type { CoinSymbol, CryptoTransaction, CryptoTransactionType, Group, Member } from "@arthurzakharov/family-budget-be-client";
 
@@ -56,48 +58,45 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
   };
 
   return (
-    <form onSubmit={onSubmit} className="transaction-form">
-      {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
-      <GroupSelect groups={groups} defaultValue={editing?.groupId} />
-      <label>
-        {t("crypto.coin")}
-        <select name="coin" required defaultValue={editing?.coin ?? ""}>
-          <option value="" disabled>
-            {t("crypto.selectCoin")}
-          </option>
-          {coinOptions.map(c => (
-            <option key={c} value={c}>
-              {c} – {coinName(c)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {t("transactions.type")}
-        <select name="type" required defaultValue={editing?.type ?? "buy"}>
-          <option value="buy">{t("type.buy")}</option>
-          <option value="sell">{t("type.sell")}</option>
-        </select>
-      </label>
-      <label>
-        {t("common.date")}
-        <input type="date" name="date" required defaultValue={editing?.date} />
-      </label>
-      <label>
-        {t("crypto.amount")}
-        <input type="number" name="amount" required min="0" step="any" defaultValue={editing?.amount} />
-      </label>
-      <label>
-        {t("crypto.rate")}
-        <input type="number" name="price" required min="0" step="any" defaultValue={editing?.price} />
-      </label>
-      <button type="submit">{editing ? t("common.saveChanges") : t("transactions.add")}</button>
-      {editing && (
-        <button type="button" onClick={onCancel}>
-          {t("common.cancel")}
-        </button>
-      )}
-      {error && <p className="error">{t(error)}</p>}
-    </form>
+    <>
+      <Message error={error} />
+      <FormGrid
+        onSubmit={onSubmit}
+        actions={
+          <>
+            <Button type="submit">{editing ? t("common.saveChanges") : t("transactions.add")}</Button>
+            {editing && (
+              <Button variant="secondary" onPress={onCancel}>
+                {t("common.cancel")}
+              </Button>
+            )}
+          </>
+        }
+      >
+        {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
+        <GroupSelect groups={groups} defaultValue={editing?.groupId} />
+        <SelectField
+          label={t("crypto.coin")}
+          name="coin"
+          isRequired
+          placeholder={t("crypto.selectCoin")}
+          defaultValue={editing?.coin ?? ""}
+          options={coinOptions.map(c => ({ id: c, label: `${c} – ${coinName(c)}` }))}
+        />
+        <SelectField
+          label={t("transactions.type")}
+          name="type"
+          isRequired
+          defaultValue={editing?.type ?? "buy"}
+          options={[
+            { id: "buy", label: t("type.buy") },
+            { id: "sell", label: t("type.sell") },
+          ]}
+        />
+        <Field label={t("common.date")} type="date" name="date" required defaultValue={editing?.date} />
+        <Field label={t("crypto.amount")} type="number" name="amount" required min="0" step="any" defaultValue={editing?.amount} />
+        <Field label={t("crypto.rate")} type="number" name="price" required min="0" step="any" defaultValue={editing?.price} />
+      </FormGrid>
+    </>
   );
 }

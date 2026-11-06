@@ -1,6 +1,7 @@
 import { serve } from "bun";
 import index from "@client/index.html";
 import { createApiProxy } from "@server/proxy";
+import { faviconRoutes } from "@server/favicons";
 
 // family-budget-be's base URL; every /api/* request is forwarded there.
 const apiUrl = process.env.API_URL?.trim();
@@ -14,6 +15,7 @@ const server = serve({
     // Serve index.html for all routes; the client handles routing.
     "/*": index,
     "/api/*": createApiProxy(apiUrl),
+    ...faviconRoutes,
   },
 
   development: process.env.NODE_ENV !== "production" && {

@@ -5,6 +5,8 @@ import { useCurrentUser } from "@client/context/auth";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { UserSelect } from "@client/components/UserSelect";
 import { GroupSelect } from "@client/components/GroupSelect";
+import { Button } from "@heroui/react";
+import { Field, FormGrid, Message, SelectField } from "@client/components/ui";
 import { kindOf, MAX_NOTE_LENGTH } from "@shared/expenses";
 import type { CategoryKind, ExpenseEntry } from "@arthurzakharov/family-budget-be-client";
 
@@ -55,49 +57,61 @@ export function EntryForm({ editing, onSaved, onCancel }: Props) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="transaction-form">
-      {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
-      <GroupSelect groups={groups} defaultValue={editing?.groupId} />
-      <label>
-        {t("transactions.type")}
-        <select value={kind} onChange={e => setKind(e.target.value as CategoryKind)}>
-          <option value="expense">{t("type.expense")}</option>
-          <option value="income">{t("type.income")}</option>
-        </select>
-      </label>
-      <label>
-        {t("expenses.category")}
+    <>
+      <Message error={error} />
+      <FormGrid
+        onSubmit={onSubmit}
+        actions={
+          <>
+            <Button type="submit">{editing ? t("common.saveChanges") : t("expenses.add")}</Button>
+            {editing && (
+              <Button variant="secondary" onPress={onCancel}>
+                {t("common.cancel")}
+              </Button>
+            )}
+          </>
+        }
+      >
+        {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
+        <GroupSelect groups={groups} defaultValue={editing?.groupId} />
+        <SelectField
+          label={t("transactions.type")}
+          value={kind}
+          onChange={v => v && setKind(v as CategoryKind)}
+          options={[
+            { id: "expense", label: t("type.expense") },
+            { id: "income", label: t("type.income") },
+          ]}
+        />
         {/* Remounted when the type changes, so the choice from the other list is dropped. */}
-        <select key={kind} name="categoryId" required defaultValue={editing?.categoryId ?? ""}>
-          <option value="" disabled>
-            {t("expenses.selectCategory")}
-          </option>
-          {options.map(c => (
-            <option key={c.id} value={c.id}>
-              {categoryName(t, c.id)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {t("common.date")}
-        <input type="date" name="date" required defaultValue={editing?.date} />
-      </label>
-      <label>
-        {t("transactions.amount")}
-        <input type="number" name="amount" required min="0.01" step="0.01" defaultValue={editing ? editing.amountCents / 100 : undefined} />
-      </label>
-      <label>
-        {t("expenses.note")}
-        <input type="text" name="note" maxLength={MAX_NOTE_LENGTH} defaultValue={editing?.note} />
-      </label>
-      <button type="submit">{editing ? t("common.saveChanges") : t("expenses.add")}</button>
-      {editing && (
-        <button type="button" onClick={onCancel}>
-          {t("common.cancel")}
-        </button>
-      )}
-      {error && <p className="error">{t(error)}</p>}
-    </form>
+        <SelectField
+          key={kind}
+          label={t("expenses.category")}
+          name="categoryId"
+          isRequired
+          placeholder={t("expenses.selectCategory")}
+          defaultValue={editing?.categoryId}
+          options={options.map(c => ({ id: c.id, label: categoryName(t, c.id) }))}
+        />
+        <Field label={t("common.date")} type="date" name="date" required defaultValue={editing?.date} />
+        <Field
+          label={t("transactions.amount")}
+          type="number"
+          name="amount"
+          required
+          min="0.01"
+          step="0.01"
+          defaultValue={editing ? editing.amountCents / 100 : undefined}
+        />
+        <Field
+          label={t("expenses.note")}
+          type="text"
+          name="note"
+          maxLength={MAX_NOTE_LENGTH}
+          defaultValue={editing?.note}
+          className="sm:col-span-2 lg:col-span-3"
+        />
+      </FormGrid>
+    </>
   );
 }

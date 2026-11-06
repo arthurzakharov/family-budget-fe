@@ -5,6 +5,7 @@ import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { EntryForm } from "@client/components/expenses/EntryForm";
 import { EntryTable } from "@client/components/expenses/EntryTable";
 import { formatCents } from "@client/utils/format";
+import { Message, Section } from "@client/components/ui";
 import type { ExpenseEntry } from "@arthurzakharov/family-budget-be-client";
 
 // Adding, editing and deleting income and expenses. Only for admins and contributors,
@@ -49,17 +50,20 @@ export function Manage() {
 
   return (
     <>
-      <h2>{t("expenses.records")}</h2>
-      {/* The key remounts the form so it empties after adding and follows the record being edited. */}
-      <EntryForm
-        key={`entry-${editing?.id ?? `new-${entries.length}`}`}
-        editing={editing}
-        onSaved={onSaved}
-        onCancel={() => edit(null)}
-      />
-      {notice && <p className="success">{t(notice)}</p>}
-      {deleteError && <p className="error">{t(deleteError)}</p>}
-      <EntryTable entries={entries} onEdit={edit} onDelete={onDelete} editingId={editing?.id} />
+      <Section title={editing ? t("common.edit") : t("expenses.add")}>
+        <Message success={notice} />
+        {/* The key remounts the form so it empties after adding and follows the record being edited. */}
+        <EntryForm
+          key={`entry-${editing?.id ?? `new-${entries.length}`}`}
+          editing={editing}
+          onSaved={onSaved}
+          onCancel={() => edit(null)}
+        />
+      </Section>
+      <Section title={t("expenses.records")}>
+        <Message error={deleteError} />
+        <EntryTable entries={entries} onEdit={edit} onDelete={onDelete} editingId={editing?.id} />
+      </Section>
     </>
   );
 }

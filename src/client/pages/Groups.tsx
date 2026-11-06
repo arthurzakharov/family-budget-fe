@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, call, load, text } from "@client/api";
 import { useI18n } from "@client/context/i18n";
+import { Button, Table } from "@heroui/react";
+import { DataTable, Field, FormGrid, Message, PageHeader, Section, SelectField } from "@client/components/ui";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
 export function Groups() {
@@ -52,64 +54,63 @@ export function Groups() {
 
   return (
     <>
-      <h1>{t("nav.groups")}</h1>
+      <PageHeader title={t("nav.groups")} />
 
-      <form onSubmit={onCreate} className="transaction-form">
-        <label>
-          {t("groups.name")}
-          <input type="text" name="name" required />
-        </label>
-        <button type="submit">{t("groups.create")}</button>
-      </form>
+      <Section title={t("groups.create")}>
+        <FormGrid onSubmit={onCreate} actions={<Button type="submit">{t("groups.create")}</Button>}>
+          <Field label={t("groups.name")} type="text" name="name" required />
+        </FormGrid>
+      </Section>
 
-      {error && <p className="error">{t(error)}</p>}
-      {groups.length === 0 && <p>{t("groups.empty")}</p>}
+      <Message error={error} />
+      {groups.length === 0 && <p className="text-sm text-muted">{t("groups.empty")}</p>}
 
-      {groups.map(g => {
-        const members = users.filter(u => u.groupIds.includes(g.id));
-        // The admin stands apart and is never offered.
-        const others = users.filter(u => u.role !== "admin" && !u.groupIds.includes(g.id));
-        return (
-          <section key={g.id}>
-            <h2>{g.name}</h2>
-            <table>
-              <tbody>
-                {members.length === 0 ? (
-                  <tr>
-                    <td colSpan={2}>{t("groups.noMembers")}</td>
-                  </tr>
-                ) : (
-                  members.map(u => (
-                    <tr key={u.id}>
-                      <td>{u.name}</td>
-                      <td>
-                        <button type="button" onClick={() => setMember(g, u.id, false)}>
+      <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
+        {groups.map(g => {
+          const members = users.filter(u => u.groupIds.includes(g.id));
+          // The admin stands apart and is never offered.
+          const others = users.filter(u => u.role !== "admin" && !u.groupIds.includes(g.id));
+          return (
+            <Section key={g.id} title={g.name}>
+              <DataTable
+                label={g.name}
+                emptyText={t("groups.noMembers")}
+                columns={
+                  <>
+                    <Table.Column isRowHeader>{t("users.name")}</Table.Column>
+                    <Table.Column aria-label={t("groups.remove")}> </Table.Column>
+                  </>
+                }
+              >
+                {members.map(u => (
+                  <Table.Row key={u.id} id={u.id}>
+                    <Table.Cell>{u.name}</Table.Cell>
+                    <Table.Cell>
+                      <div className="flex justify-end">
+                        <Button size="sm" variant="danger-soft" onPress={() => setMember(g, u.id, false)}>
                           {t("groups.remove")}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            {others.length > 0 && (
-              <form onSubmit={e => onAdd(e, g)} className="inline-form">
-                <select name="userId" required defaultValue="">
-                  <option value="" disabled>
-                    {t("auth.selectUser")}
-                  </option>
-                  {others.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit">{t("groups.add")}</button>
-              </form>
-            )}
-          </section>
-        );
-      })}
+                        </Button>
+                      </div>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </DataTable>
+              {others.length > 0 && (
+                <form onSubmit={e => onAdd(e, g)} className="mt-4 flex items-end gap-2">
+                  <SelectField
+                    label={t("auth.selectUser")}
+                    name="userId"
+                    isRequired
+                    placeholder={t("auth.selectUser")}
+                    options={others.map(u => ({ id: u.id, label: u.name }))}
+                  />
+                  <Button type="submit">{t("groups.add")}</Button>
+                </form>
+              )}
+            </Section>
+          );
+        })}
+      </div>
     </>
   );
 }

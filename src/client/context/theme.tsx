@@ -26,7 +26,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState(initialTheme);
 
   useEffect(() => {
+    // HeroUI reads either the data-theme attribute or the class, so set both.
     document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("light", theme === "light");
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {}

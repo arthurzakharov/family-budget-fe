@@ -1,4 +1,6 @@
+import { Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
+import { DataTable, editingRow, RowActions } from "@client/components/ui";
 import { addedBy } from "@client/utils/format";
 import type { DepositRate, Member } from "@arthurzakharov/family-budget-be-client";
 
@@ -16,39 +18,32 @@ export function RateTable({ rates, members, onEdit, editingId }: Props) {
   const sorted = [...rates].sort((a, b) => (a.from ?? "").localeCompare(b.from ?? ""));
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>{t("rates.rate")}</th>
-          <th>{t("rates.from")}</th>
-          <th>{t("rates.till")}</th>
-          <th>{t("common.addedBy")}</th>
-          {onEdit && <th></th>}
-        </tr>
-      </thead>
-      <tbody>
-        {sorted.length === 0 ? (
-          <tr>
-            <td colSpan={onEdit ? 5 : 4}>{t("rates.empty")}</td>
-          </tr>
-        ) : (
-          sorted.map(r => (
-            <tr key={r.id} className={r.id === editingId ? "editing" : ""}>
-              <td>{r.ratePercent}</td>
-              <td>{r.from ?? t("rates.beginning")}</td>
-              <td>{r.till ?? t("rates.current")}</td>
-              <td>{addedBy(members, r.userId, t)}</td>
-              {onEdit && (
-                <td>
-                  <button type="button" onClick={() => onEdit(r)}>
-                    {t("common.edit")}
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
+    <DataTable
+      label={t("rates.title")}
+      emptyText={t("rates.empty")}
+      columns={
+        <>
+          <Table.Column isRowHeader>{t("rates.rate")}</Table.Column>
+          <Table.Column>{t("rates.from")}</Table.Column>
+          <Table.Column>{t("rates.till")}</Table.Column>
+          <Table.Column>{t("common.addedBy")}</Table.Column>
+          {onEdit && <Table.Column aria-label={t("common.edit")}> </Table.Column>}
+        </>
+      }
+    >
+      {sorted.map(r => (
+        <Table.Row key={r.id} id={r.id} className={editingRow(r.id === editingId)}>
+          <Table.Cell className="tabular-nums">{r.ratePercent}</Table.Cell>
+          <Table.Cell className="whitespace-nowrap">{r.from ?? t("rates.beginning")}</Table.Cell>
+          <Table.Cell className="whitespace-nowrap">{r.till ?? t("rates.current")}</Table.Cell>
+          <Table.Cell>{addedBy(members, r.userId, t)}</Table.Cell>
+          {onEdit && (
+            <Table.Cell>
+              <RowActions onEdit={() => onEdit(r)} />
+            </Table.Cell>
+          )}
+        </Table.Row>
+      ))}
+    </DataTable>
   );
 }

@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import { api, call } from "@client/api";
 import { useI18n } from "@client/context/i18n";
 import { useCrypto } from "@client/context/crypto";
+import { Button, Table } from "@heroui/react";
+import { CheckboxField, DataTable, Message, Section } from "@client/components/ui";
 import { COINS } from "@shared/crypto";
 import type { CoinSymbol } from "@arthurzakharov/family-budget-be-client";
 
@@ -36,39 +38,40 @@ export function Coins() {
   };
 
   return (
-    <form onSubmit={onSubmit}>
-      <h2>{t("crypto.coins")}</h2>
-      <p>{t("crypto.coinsHint")}</p>
-      <table>
-        <thead>
-          <tr>
-            <th>{t("crypto.available")}</th>
-            <th>{t("crypto.coin")}</th>
-            <th>{t("crypto.name")}</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Section title={t("crypto.coins")} description={t("crypto.coinsHint")}>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <DataTable
+          label={t("crypto.coins")}
+          columns={
+            <>
+              <Table.Column className="w-24">{t("crypto.available")}</Table.Column>
+              <Table.Column isRowHeader>{t("crypto.coin")}</Table.Column>
+              <Table.Column>{t("crypto.name")}</Table.Column>
+            </>
+          }
+        >
           {COINS.map(c => (
-            <tr key={c.symbol}>
-              <td>
-                <input
-                  type="checkbox"
+            <Table.Row key={c.symbol} id={c.symbol}>
+              <Table.Cell>
+                <CheckboxField
+                  label=""
                   aria-label={c.name}
-                  checked={current.includes(c.symbol)}
-                  onChange={e => toggle(c.symbol, e.target.checked)}
+                  isSelected={current.includes(c.symbol)}
+                  onChange={on => toggle(c.symbol, on)}
                 />
-              </td>
-              <td>{c.symbol}</td>
-              <td>{c.name}</td>
-            </tr>
+              </Table.Cell>
+              <Table.Cell className="font-medium">{c.symbol}</Table.Cell>
+              <Table.Cell>{c.name}</Table.Cell>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
-      <button type="submit" disabled={selected === null}>
-        {t("common.saveChanges")}
-      </button>
-      {notice && <p className="success">{t(notice)}</p>}
-      {error && <p className="error">{t(error)}</p>}
-    </form>
+        </DataTable>
+        <div>
+          <Button type="submit" isDisabled={selected === null}>
+            {t("common.saveChanges")}
+          </Button>
+        </div>
+        <Message error={error} success={notice} />
+      </form>
+    </Section>
   );
 }

@@ -1,6 +1,7 @@
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { hasSeveralGroups, visibleGroups } from "@client/utils/access";
+import { SelectField } from "@client/components/ui";
 import type { Group } from "@arthurzakharov/family-budget-be-client";
 
 type Props = {
@@ -21,18 +22,13 @@ export function GroupSelect({ groups, defaultValue }: Props) {
   }
 
   return (
-    <label>
-      {t("transactions.group")}
-      <select name="groupId" required defaultValue={defaultValue ?? ""}>
-        <option value="" disabled>
-          {t("transactions.selectGroup")}
-        </option>
-        {visibleGroups(me, groups).map(g => (
-          <option key={g.id} value={g.id}>
-            {g.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <SelectField
+      label={t("transactions.group")}
+      name="groupId"
+      isRequired
+      placeholder={t("transactions.selectGroup")}
+      defaultValue={defaultValue}
+      options={visibleGroups(me, groups).map(g => ({ id: g.id, label: g.name }))}
+    />
   );
 }
