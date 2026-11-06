@@ -1,0 +1,26 @@
+{
+  "name": "familly-budget-fe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server/index.ts",
+    "build": "bun build ./src/client/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
+    "start": "NODE_ENV=production bun src/server/index.ts"
+  },
+  "dependencies": {
+    "@arthurzakharov/family-budget-be-client": "file:../familly-budget-be/dist-client",
+    "@tanstack/react-router": "1.170.1",
+    "hono": "^4.13.12",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}
