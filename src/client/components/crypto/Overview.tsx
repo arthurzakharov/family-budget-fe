@@ -1,9 +1,9 @@
 import { ChartLine } from "@gravity-ui/icons";
 import { useI18n } from "@client/context/i18n";
 import { NoRecords } from "@client/components/NoRecords";
-import { useCrypto } from "@client/context/crypto";
+import { useCrypto, useUpdatePrices } from "@client/context/crypto";
 import { HoldingsTable } from "@client/components/crypto/HoldingsTable";
-import { PricesUpdater } from "@client/components/crypto/PricesUpdater";
+import { PricesError, PricesUpdater } from "@client/components/crypto/PricesUpdater";
 import { GroupHoldingsTable } from "@client/components/crypto/GroupHoldingsTable";
 import { CryptoTransactionTable } from "@client/components/crypto/CryptoTransactionTable";
 import { Section, Stat, StatGrid } from "@client/components/ui";
@@ -18,6 +18,8 @@ type Props = {
 // Read-only view of the crypto holdings, narrowed to some groups.
 export function Overview({ groupIds }: Props) {
   const { t } = useI18n();
+  // "Update prices" in the holdings' header; its error shows in the holdings' body.
+  const updatePrices = useUpdatePrices();
   const { groups, members, transactions, prices, isLoading } = useCrypto();
   const shown = transactions.filter(tx => groupIds.includes(tx.groupId));
   // Nothing recorded for these groups yet (once the data has arrived): say so instead of
@@ -36,8 +38,12 @@ export function Overview({ groupIds }: Props) {
         <Stat label={t("crypto.gain")} value={formatMoney(gain)} tone={gain < 0 ? "danger" : gain > 0 ? "success" : undefined} />
       </StatGrid>
 
-      <Section title={t("crypto.holdings")} description={t("crypto.rateHint")}>
-        <PricesUpdater />
+      <Section
+        title={t("crypto.holdings")}
+        description={t("crypto.rateHint")}
+        actions={<PricesUpdater update={updatePrices} />}
+      >
+        <PricesError update={updatePrices} />
         <HoldingsTable summary={summary} prices={prices} />
       </Section>
 

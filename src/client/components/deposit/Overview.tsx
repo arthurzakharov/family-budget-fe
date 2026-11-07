@@ -22,12 +22,26 @@ export function Overview({ groupIds, showRates = false }: Props) {
   const { t } = useI18n();
   const { groups, members, transactions, rates, interest, isLoading } = useDeposit();
   const shown = transactions.filter(tx => groupIds.includes(tx.groupId));
-  // Nothing recorded for these groups yet (once the data has arrived): say so instead of
+  const view = forGroups(interest, groupIds);
+
+  // The deposit's rates, on General only. They are added before the first transaction, so they
+  // stay visible above the empty screen too (once there are any).
+  const ratesSection = showRates && (
+    <Section title={t("rates.title")}>
+      <RateTable rates={rates} members={members} />
+    </Section>
+  );
+
+  // No transactions for these groups yet (once the data has arrived): say so instead of
   // showing empty tables and zero totals.
   if (!isLoading && shown.length === 0) {
-    return <NoRecords icon={Vault} title="empty.deposit" manage="/deposit/manage" />;
+    return (
+      <>
+        {rates.length > 0 && ratesSection}
+        <NoRecords icon={Vault} title="empty.deposit" manage="/deposit/manage" />
+      </>
+    );
   }
-  const view = forGroups(interest, groupIds);
 
   return (
     <>
@@ -37,11 +51,7 @@ export function Overview({ groupIds, showRates = false }: Props) {
         <Stat label={t("totals.pending")} value={formatCents(view.pending)} />
       </StatGrid>
 
-      {showRates && (
-        <Section title={t("rates.title")}>
-          <RateTable rates={rates} members={members} />
-        </Section>
-      )}
+      {ratesSection}
 
       <Section title={t("transactions.title")}>
         <TransactionTable transactions={shown} groups={groups} members={members} totals={view} />

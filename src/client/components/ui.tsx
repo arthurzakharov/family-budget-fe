@@ -36,8 +36,9 @@ export function Section({
   return (
     <Card className={`mb-6 min-w-0 ${className ?? ""}`}>
       {(title || actions) && (
-        <Card.Header className="flex-row flex-wrap items-start justify-between gap-2">
-          <div>
+        <Card.Header className="flex-row flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          {/* Takes the space left of the actions, so a long description wraps beside them. */}
+          <div className="min-w-0 flex-1 basis-64">
             {title && <Card.Title className="text-lg">{title}</Card.Title>}
             {description && <Card.Description>{description}</Card.Description>}
           </div>
