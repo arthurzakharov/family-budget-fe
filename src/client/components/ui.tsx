@@ -208,7 +208,7 @@ export function RowActions({ onEdit, onDelete, extra }: { onEdit?: () => void; o
 
 type DataTableProps = Pick<ComponentProps<typeof Table.Content>, "sortDescriptor" | "onSortChange"> & {
   label: string;
-  // <Table.Column> elements (or the `column` helper from useSort)
+  // <Table.Column> elements
   columns: ReactNode;
   // <Table.Row> elements
   children: ReactNode;

@@ -151,6 +151,9 @@ export const ru: Record<TranslationKey, string> = {
   "tabs.manage": "Управление записями",
   "common.addedBy": "Добавил(а)",
   "common.selectUser": "Выберите пользователя",
+  "table.range": "{from}–{to} из {total}",
+  "table.previous": "Предыдущая страница",
+  "table.next": "Следующая страница",
 
   "rates.title": "Ставки",
   "rates.rate": "Ставка, %",

@@ -148,6 +148,9 @@ export const en = {
   "tabs.manage": "Manage records",
   "common.addedBy": "Added by",
   "common.selectUser": "Select user",
+  "table.range": "{from}–{to} of {total}",
+  "table.previous": "Previous page",
+  "table.next": "Next page",
 
   "rates.title": "Rates",
   "rates.rate": "Rate, %",
