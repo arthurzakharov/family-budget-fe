@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 export const themes = ["light", "dark"] as const;
 
@@ -21,19 +22,40 @@ function initialTheme(): Theme {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+// Puts the theme on <html>. HeroUI reads either the data-theme attribute or the class, so set both.
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  root.classList.toggle("dark", theme === "dark");
+  root.classList.toggle("light", theme === "light");
+}
+
 // Applies the theme to <html data-theme="..."> and remembers the choice.
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState(initialTheme);
+  const [theme, setThemeState] = useState(initialTheme);
 
   useEffect(() => {
-    // HeroUI reads either the data-theme attribute or the class, so set both.
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.classList.toggle("light", theme === "light");
+    applyTheme(theme);
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {}
   }, [theme]);
+
+  // Switching crossfades the whole page from the old colours to the new ones (the duration is in
+  // index.css). Browsers without view transitions, and people who asked for less motion, get
+  // the switch at once.
+  const setTheme = (next: Theme) => {
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (next === theme || reduceMotion || !document.startViewTransition) {
+      setThemeState(next);
+      return;
+    }
+    document.startViewTransition(() => {
+      // The new look must be in place when the callback returns, so apply it right away.
+      applyTheme(next);
+      flushSync(() => setThemeState(next));
+    });
+  };
 
   return <ThemeContext value={{ theme, setTheme }}>{children}</ThemeContext>;
 }
