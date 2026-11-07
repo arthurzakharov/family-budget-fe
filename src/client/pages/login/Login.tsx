@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useI18n } from "@client/context/i18n";
-import { api } from "@client/api";
+import { useAuthMutation } from "@client/context/auth";
+import { api, errorCode } from "@client/api";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
-import { AuthActions, AuthShell, useAuthRequest } from "@client/pages/login/AuthShell";
-import { Field, FormStack, Message } from "@client/components/ui";
+import { AuthActions, AuthShell } from "@client/pages/login/AuthShell";
+import { submitWith, useAppForm } from "@client/components/form";
+import { FormStack, Message } from "@client/components/ui";
 
 type Step = "start" | "login" | "signupWorkspace" | "signupUser";
 
@@ -13,110 +15,136 @@ type Workspace = { email: string; password: string };
 // The "who are you?" step after logging in to the workspace is ChooseUser.
 export function Login() {
   const { t } = useI18n();
-  const { isLoading, error, setError, submit } = useAuthRequest();
   const [step, setStep] = useState<Step>("start");
   // Sign up is sent in one request at the end, so nothing is saved halfway.
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
-  const go = (next: Step) => {
-    setError(null);
-    setStep(next);
-  };
-
-  const formData = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    return Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-  };
-
-  const onLogin = async (e: FormEvent<HTMLFormElement>) => {
-    const { email, password } = formData(e);
-    await submit(() => api.auth.login.$post({ json: { email: email ?? "", password: password ?? "" } }));
-  };
-
-  const onWorkspace = (e: FormEvent<HTMLFormElement>) => {
-    const { email, password } = formData(e);
-    setWorkspace({ email: email!, password: password! });
-    go("signupUser");
-  };
-
-  const onRootUser = async (e: FormEvent<HTMLFormElement>) => {
-    const { name, userPassword } = formData(e);
-    if (!workspace) return go("signupWorkspace");
-    await submit(() => api.auth.signup.$post({ json: { ...workspace, name: name ?? "", userPassword: userPassword ?? "" } }));
-  };
-
-  // Each step uses key={step} so React creates fresh inputs instead of reusing
-  // the previous step's ones (which would keep the values typed there).
+  // Each step is its own component with its own form, so going back and forth starts each
+  // step with fresh values (except the workspace, which is kept for going back to it).
   if (step === "start") {
     return (
-      <AuthShell key={step} title={t("auth.welcome")}>
+      <AuthShell title={t("auth.welcome")}>
         <AuthActions
-          forward={{ label: t("auth.login"), onPress: () => go("login") }}
-          back={{ label: t("auth.signup"), onPress: () => go("signupWorkspace") }}
+          forward={{ label: t("auth.login"), onPress: () => setStep("login") }}
+          back={{ label: t("auth.signup"), onPress: () => setStep("signupWorkspace") }}
         />
       </AuthShell>
     );
   }
 
-  // The submit button plus "Back" to the given step.
-  const actions = (label: string, to: Step) => (
-    <AuthActions forward={{ label }} back={{ label: t("auth.back"), onPress: () => go(to) }} />
-  );
+  if (step === "login") return <LoginStep onBack={() => setStep("start")} />;
 
-  if (step === "login") {
+  if (step === "signupWorkspace" || !workspace) {
     return (
-      <AuthShell key={step} title={t("auth.loginTitle")} isLoading={isLoading}>
-        <FormStack onSubmit={onLogin}>
-          <Message error={error} />
-          <Field label={t("auth.email")} type="email" name="email" required autoComplete="username" />
-          <Field label={t("auth.workspacePassword")} type="password" name="password" required autoComplete="current-password" />
-          {actions(t("auth.login"), "start")}
-        </FormStack>
-      </AuthShell>
+      <WorkspaceStep
+        initial={workspace}
+        onNext={ws => {
+          setWorkspace(ws);
+          setStep("signupUser");
+        }}
+        onBack={() => setStep("start")}
+      />
     );
   }
 
-  if (step === "signupWorkspace") {
-    return (
-      <AuthShell key={step} title={t("auth.signupWorkspaceTitle")} description={t("auth.signupWorkspaceHint")}>
-        <FormStack onSubmit={onWorkspace}>
-          <Field
-            label={t("auth.email")}
-            type="email"
-            name="email"
-            required
-            autoComplete="username"
-            defaultValue={workspace?.email}
-          />
-          <Field
-            label={t("auth.workspacePassword")}
-            type="password"
-            name="password"
-            required
-            minLength={MIN_PASSWORD_LENGTH}
-            autoComplete="new-password"
-            defaultValue={workspace?.password}
-          />
-          {actions(t("auth.next"), "start")}
-        </FormStack>
-      </AuthShell>
-    );
-  }
+  return <RootUserStep workspace={workspace} onBack={() => setStep("signupWorkspace")} />;
+}
+
+function LoginStep({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n();
+  const login = useAuthMutation((json: Workspace) => api.auth.login.$post({ json }));
+  const form = useAppForm({
+    defaultValues: { email: "", password: "" },
+    // A failure is shown from login.error; on success the router moves on to the next step.
+    onSubmit: ({ value }) => login.mutateAsync(value).catch(() => {}),
+  });
 
   return (
-    <AuthShell key={step} title={t("auth.signupUserTitle")} description={t("auth.signupUserHint")} isLoading={isLoading}>
-      <FormStack onSubmit={onRootUser}>
-        <Message error={error} />
-        <Field label={t("auth.yourName")} type="text" name="name" required autoComplete="off" />
-        <Field
-          label={t("auth.yourPassword")}
-          type="password"
-          name="userPassword"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          autoComplete="new-password"
-        />
-        {actions(t("auth.signup"), "signupWorkspace")}
+    <AuthShell title={t("auth.loginTitle")} isLoading={login.isPending}>
+      <FormStack onSubmit={submitWith(form)}>
+        <Message error={errorCode(login.error)} />
+        <form.AppField name="email">
+          {field => <field.TextField label={t("auth.email")} type="email" required autoComplete="username" />}
+        </form.AppField>
+        <form.AppField name="password">
+          {field => (
+            <field.TextField label={t("auth.workspacePassword")} type="password" required autoComplete="current-password" />
+          )}
+        </form.AppField>
+        <AuthActions forward={{ label: t("auth.login") }} back={{ label: t("auth.back"), onPress: onBack }} />
+      </FormStack>
+    </AuthShell>
+  );
+}
+
+function WorkspaceStep({
+  initial,
+  onNext,
+  onBack,
+}: {
+  initial: Workspace | null;
+  onNext: (workspace: Workspace) => void;
+  onBack: () => void;
+}) {
+  const { t } = useI18n();
+  const form = useAppForm({
+    defaultValues: initial ?? { email: "", password: "" },
+    onSubmit: ({ value }) => onNext(value),
+  });
+
+  return (
+    <AuthShell title={t("auth.signupWorkspaceTitle")} description={t("auth.signupWorkspaceHint")}>
+      <FormStack onSubmit={submitWith(form)}>
+        <form.AppField name="email">
+          {field => <field.TextField label={t("auth.email")} type="email" required autoComplete="username" />}
+        </form.AppField>
+        <form.AppField name="password">
+          {field => (
+            <field.TextField
+              label={t("auth.workspacePassword")}
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+            />
+          )}
+        </form.AppField>
+        <AuthActions forward={{ label: t("auth.next") }} back={{ label: t("auth.back"), onPress: onBack }} />
+      </FormStack>
+    </AuthShell>
+  );
+}
+
+function RootUserStep({ workspace, onBack }: { workspace: Workspace; onBack: () => void }) {
+  const { t } = useI18n();
+  const signup = useAuthMutation((json: Workspace & { name: string; userPassword: string }) =>
+    api.auth.signup.$post({ json }),
+  );
+  const form = useAppForm({
+    defaultValues: { name: "", userPassword: "" },
+    // A failure is shown from signup.error; on success the router moves on to the app.
+    onSubmit: ({ value }) => signup.mutateAsync({ ...workspace, ...value }).catch(() => {}),
+  });
+
+  return (
+    <AuthShell title={t("auth.signupUserTitle")} description={t("auth.signupUserHint")} isLoading={signup.isPending}>
+      <FormStack onSubmit={submitWith(form)}>
+        <Message error={errorCode(signup.error)} />
+        <form.AppField name="name">
+          {field => <field.TextField label={t("auth.yourName")} type="text" required autoComplete="off" />}
+        </form.AppField>
+        <form.AppField name="userPassword">
+          {field => (
+            <field.TextField
+              label={t("auth.yourPassword")}
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+            />
+          )}
+        </form.AppField>
+        <AuthActions forward={{ label: t("auth.signup") }} back={{ label: t("auth.back"), onPress: onBack }} />
       </FormStack>
     </AuthShell>
   );

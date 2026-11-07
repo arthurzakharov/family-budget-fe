@@ -25,18 +25,9 @@ const navItems: NavItem[] = [
   { to: "/settings", label: "nav.settings", icon: Gear },
 ];
 
-// Every tab is an icon button; only the active tab, and the one under the pointer or keyboard
-// focus, also shows its text. The label is always in the DOM (it names the link for screen
-// readers) and slides open by animating its max-width.
 const linkClass =
-  "group flex shrink-0 items-center rounded-full px-2.5 py-1.5 text-sm font-medium text-muted outline-none transition-colors duration-500 hover:bg-default hover:text-foreground focus-visible:bg-default focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
+  "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-2.5 py-1.5 md:px-3 text-sm font-medium text-muted outline-none transition-colors duration-500 hover:bg-default hover:text-foreground focus-visible:bg-default focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
 const activeClass = "!bg-accent !text-accent-foreground";
-
-const labelClass =
-  "overflow-hidden whitespace-nowrap transition-[max-width,margin,opacity] duration-500 ease-in-out motion-reduce:transition-none";
-const collapsed =
-  "ml-0 max-w-0 opacity-0 group-hover:delay-200 group-hover:ml-2 group-hover:max-w-40 group-hover:opacity-100 group-focus-visible:ml-2 group-focus-visible:max-w-40 group-focus-visible:opacity-100";
-const expanded = "ml-2 max-w-40 opacity-100";
 
 export function Layout() {
   const { t } = useI18n();
@@ -63,12 +54,8 @@ export function Layout() {
                   activeProps={{ className: activeClass }}
                   activeOptions={{ exact: to === "/" }}
                 >
-                  {({ isActive }) => (
-                    <>
-                      <Icon className="size-4 shrink-0" />
-                      <span className={`${labelClass} ${isActive ? expanded : collapsed}`}>{t(label)}</span>
-                    </>
-                  )}
+                  <Icon className="size-4 shrink-0" />
+                  <span className="sr-only md:not-sr-only">{t(label)}</span>
                 </Link>
               ))}
           </nav>

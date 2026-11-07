@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatCents } from "@client/utils/format";
-import { api, call } from "@client/api";
+import { api, errorCode, request } from "@client/api";
+import { queries, useDeleteMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useDeposit } from "@client/context/deposit";
 import { RateForm } from "@client/components/deposit/RateForm";
@@ -13,34 +14,28 @@ import type { DepositRate, DepositTransaction } from "@arthurzakharov/family-bud
 // Adding, editing and deleting rates and transactions. Only for admins and contributors.
 export function Manage() {
   const { t } = useI18n();
-  const { groups, members, transactions, rates, setTransactions, setRates } = useDeposit();
+  const { groups, members, transactions, rates } = useDeposit();
   const [editingRate, setEditingRate] = useState<DepositRate | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<DepositTransaction | null>(null);
   // Success messages; the forms stay on this tab and are emptied after adding.
   const [rateNotice, setRateNotice] = useState<string | null>(null);
   const [transactionNotice, setTransactionNotice] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Deleting a transaction changes the interest, which the server works out.
+  const remove = useDeleteMutation(
+    queries.depositTransactions,
+    id => request(api.deposit.transactions[":id"].$delete({ param: { id } })),
+    { invalidates: [queries.depositInterest.queryKey] },
+  );
 
-  const onRateSaved = (saved: DepositRate) => {
-    if (editingRate) {
-      setRates(rates.map(r => (r.id === saved.id ? saved : r)));
-      setEditingRate(null);
-      setRateNotice("common.saved");
-    } else {
-      setRates([...rates, saved]);
-      setRateNotice("rates.added");
-    }
+  // The forms have already put the saved record in the lists.
+  const onRateSaved = () => {
+    setRateNotice(editingRate ? "common.saved" : "rates.added");
+    setEditingRate(null);
   };
 
-  const onTransactionSaved = (saved: DepositTransaction) => {
-    if (editingTransaction) {
-      setTransactions(transactions.map(tx => (tx.id === saved.id ? saved : tx)));
-      setEditingTransaction(null);
-      setTransactionNotice("common.saved");
-    } else {
-      setTransactions([...transactions, saved]);
-      setTransactionNotice("transactions.added");
-    }
+  const onTransactionSaved = () => {
+    setTransactionNotice(editingTransaction ? "common.saved" : "transactions.added");
+    setEditingTransaction(null);
   };
 
   const editRate = (rate: DepositRate | null) => {
@@ -56,13 +51,11 @@ export function Manage() {
   const onDelete = async (tx: DepositTransaction) => {
     const message = tx.type === "withdrawal" ? "transactions.confirmDeleteWithdrawal" : "transactions.confirmDeleteDeposit";
     if (!confirm(t(message, { amount: formatCents(tx.amountCents), date: tx.date }))) return;
-    const result = await call(api.deposit.transactions[":id"].$delete({ param: { id: tx.id } }));
-    if (!result.ok) {
-      setDeleteError(result.error);
-      return;
+    try {
+      await remove.mutateAsync(tx.id);
+    } catch {
+      return; // shown from remove.error
     }
-    setDeleteError(null);
-    setTransactions(transactions.filter(x => x.id !== tx.id));
     if (editingTransaction?.id === tx.id) setEditingTransaction(null);
   };
 
@@ -70,9 +63,9 @@ export function Manage() {
     <>
       <Section title={editingRate ? t("common.edit") : t("rates.add")}>
         <Message success={rateNotice} />
-        {/* The keys remount the forms so they empty after adding and follow the record being edited. */}
+        {/* The keys remount the forms so they follow the record being edited. */}
         <RateForm
-          key={`rate-${editingRate?.id ?? `new-${rates.length}`}`}
+          key={editingRate?.id ?? "new"}
           editing={editingRate}
           members={members}
           onSaved={onRateSaved}
@@ -86,7 +79,7 @@ export function Manage() {
       <Section title={editingTransaction ? t("common.edit") : t("transactions.add")}>
         <Message success={transactionNotice} />
         <TransactionForm
-          key={`transaction-${editingTransaction?.id ?? `new-${transactions.length}`}`}
+          key={editingTransaction?.id ?? "new"}
           editing={editingTransaction}
           groups={groups}
           members={members}
@@ -95,7 +88,7 @@ export function Manage() {
         />
       </Section>
       <Section title={t("transactions.title")}>
-        <Message error={deleteError} />
+        <Message error={errorCode(remove.error)} />
         <TransactionTable
           transactions={transactions}
           groups={groups}

@@ -1,56 +1,72 @@
-import { useState, type FormEvent } from "react";
-import { api, call, chosenUser, text } from "@client/api";
+import { useStore } from "@tanstack/react-form";
+import { api, errorCode, request } from "@client/api";
+import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
+import { submitWith, useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
 import { Button } from "@heroui/react";
-import { CheckboxField, Field, FormGrid, Message } from "@client/components/ui";
+import { FormGrid, Message } from "@client/components/ui";
 import type { DepositRate, Member } from "@arthurzakharov/family-budget-be-client";
+
+type Json = Parameters<typeof api.deposit.rates.$post>[0]["json"];
 
 type FormProps = {
   editing: DepositRate | null;
   members: Member[];
-  onSaved: (rate: DepositRate) => void;
+  // Called after the server has saved the rate
+  onSaved: () => void;
   onCancel: () => void;
 };
 
-// Adds a rate period, or edits `editing` when given.
+// Adds a rate period, or edits `editing` when given. It empties itself after adding.
 export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
   const { t } = useI18n();
   const me = useCurrentUser();
-  const [fromBeginning, setFromBeginning] = useState(editing ? editing.from === null : false);
-  const [current, setCurrent] = useState(editing ? editing.till === null : false);
-  const [error, setError] = useState<string | null>(null);
+  // Rates change the interest, which the server works out.
+  const save = useSaveMutation(
+    queries.depositRates,
+    (json: Json) =>
+      request(editing ? api.deposit.rates[":id"].$put({ param: { id: editing.id }, json }) : api.deposit.rates.$post({ json })),
+    { invalidates: [queries.depositInterest.queryKey] },
+  );
 
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-
-    const json = {
-      ratePercent: Number(text(data, "ratePercent")),
-      from: fromBeginning ? null : text(data, "from"),
-      till: current ? null : text(data, "till"),
-      userId: chosenUser(data),
-    };
-    const result = await call(
-      editing ? api.deposit.rates[":id"].$put({ param: { id: editing.id }, json }) : api.deposit.rates.$post({ json }),
-    );
-
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    onSaved(result.data);
-  };
+  const form = useAppForm({
+    defaultValues: {
+      userId: editing?.userId ?? "",
+      ratePercent: editing ? String(editing.ratePercent) : "",
+      from: editing?.from ?? "",
+      till: editing?.till ?? "",
+      // "From the beginning" and "current" switch their date off; the date is then sent as null.
+      fromBeginning: editing ? editing.from === null : false,
+      current: editing ? editing.till === null : false,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      try {
+        await save.mutateAsync({
+          ratePercent: Number(value.ratePercent),
+          from: value.fromBeginning ? null : value.from,
+          till: value.current ? null : value.till,
+          userId: value.userId || undefined,
+        });
+      } catch {
+        return; // shown from save.error
+      }
+      if (!editing) formApi.reset();
+      onSaved();
+    },
+  });
+  const fromBeginning = useStore(form.store, state => state.values.fromBeginning);
+  const current = useStore(form.store, state => state.values.current);
 
   return (
-    <>
-      <Message error={error} />
+    <form.AppForm>
+      <Message error={errorCode(save.error)} />
       <FormGrid
-        onSubmit={onSubmit}
+        onSubmit={submitWith(form)}
         actions={
           <>
-            <Button type="submit">{editing ? t("common.saveChanges") : t("rates.add")}</Button>
+            <form.SubmitButton>{editing ? t("common.saveChanges") : t("rates.add")}</form.SubmitButton>
             {editing && (
               <Button variant="secondary" onPress={onCancel}>
                 {t("common.cancel")}
@@ -59,41 +75,23 @@ export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
           </>
         }
       >
-        {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
-        <Field
-          label={t("rates.rate")}
-          type="number"
-          name="ratePercent"
-          required
-          min="0"
-          max="100"
-          step="0.0001"
-          defaultValue={editing?.ratePercent}
-        />
-        {/* The checkboxes only switch their date field off; they are not sent with the form. */}
+        {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
+        <form.AppField name="ratePercent">
+          {field => <field.TextField label={t("rates.rate")} type="number" required min="0" max="100" step="0.0001" />}
+        </form.AppField>
         <div className="flex flex-col gap-2">
-          <Field
-            label={t("rates.from")}
-            type="date"
-            name="from"
-            required={!fromBeginning}
-            disabled={fromBeginning}
-            defaultValue={editing?.from ?? ""}
-          />
-          <CheckboxField label={t("rates.fromBeginning")} isSelected={fromBeginning} onChange={setFromBeginning} />
+          <form.AppField name="from">
+            {field => <field.TextField label={t("rates.from")} type="date" required={!fromBeginning} disabled={fromBeginning} />}
+          </form.AppField>
+          <form.AppField name="fromBeginning">{field => <field.CheckboxField label={t("rates.fromBeginning")} />}</form.AppField>
         </div>
         <div className="flex flex-col gap-2">
-          <Field
-            label={t("rates.till")}
-            type="date"
-            name="till"
-            required={!current}
-            disabled={current}
-            defaultValue={editing?.till ?? ""}
-          />
-          <CheckboxField label={t("rates.current")} isSelected={current} onChange={setCurrent} />
+          <form.AppField name="till">
+            {field => <field.TextField label={t("rates.till")} type="date" required={!current} disabled={current} />}
+          </form.AppField>
+          <form.AppField name="current">{field => <field.CheckboxField label={t("rates.current")} />}</form.AppField>
         </div>
       </FormGrid>
-    </>
+    </form.AppForm>
   );
 }

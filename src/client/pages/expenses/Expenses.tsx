@@ -1,6 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
 import { useI18n } from "@client/context/i18n";
-import { ExpensesProvider, useExpenses } from "@client/context/expenses";
+import { useExpenses } from "@client/context/expenses";
 import { SectionTabs } from "@client/components/SectionTabs";
 import { PageHeader } from "@client/components/ui";
 
@@ -8,11 +8,11 @@ import { PageHeader } from "@client/components/ui";
 export function Expenses() {
   const { t } = useI18n();
   return (
-    <ExpensesProvider>
+    <>
       <PageHeader title={t("nav.expenses")} />
       <Tabs />
       <Outlet />
-    </ExpensesProvider>
+    </>
   );
 }
 

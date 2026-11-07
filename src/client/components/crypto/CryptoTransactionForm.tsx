@@ -1,13 +1,16 @@
-import { useState, type FormEvent } from "react";
-import { api, call, chosenUser, text } from "@client/api";
+import { api, errorCode, request } from "@client/api";
+import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
+import { submitWith, useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
-import { GroupSelect } from "@client/components/GroupSelect";
+import { defaultGroup, GroupSelect } from "@client/components/GroupSelect";
 import { Button } from "@heroui/react";
-import { Field, FormGrid, Message, SelectField } from "@client/components/ui";
+import { FormGrid, Message } from "@client/components/ui";
 import { coinName } from "@shared/crypto";
-import type { CoinSymbol, CryptoTransaction, CryptoTransactionType, Group, Member } from "@arthurzakharov/family-budget-be-client";
+import type { CoinSymbol, CryptoTransaction, Group, Member } from "@arthurzakharov/family-budget-be-client";
+
+type Json = Parameters<typeof api.crypto.transactions.$post>[0]["json"];
 
 type Props = {
   editing: CryptoTransaction | null;
@@ -15,56 +18,64 @@ type Props = {
   members: Member[];
   // Coins the admin has made available
   coins: CoinSymbol[];
-  onSaved: (transaction: CryptoTransaction) => void;
+  // Called after the server has saved the transaction
+  onSaved: () => void;
   onCancel: () => void;
 };
 
-// Adds a buy or sell, or edits `editing` when given.
-// The parent remounts it (with a key) so its default values follow the record being edited.
+// Adds a buy or sell, or edits `editing` when given. It empties itself after adding.
+// The parent remounts it (with a key) so its starting values follow the record being edited.
 export function CryptoTransactionForm({ editing, groups, members, coins, onSaved, onCancel }: Props) {
   const { t } = useI18n();
   const me = useCurrentUser();
-  const [error, setError] = useState<string | null>(null);
   // A record keeps its coin even after the admin turns that coin off.
   const coinOptions = editing && !coins.includes(editing.coin) ? [...coins, editing.coin] : coins;
-
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const data = new FormData(form);
-
-    const json = {
-      groupId: text(data, "groupId"),
-      coin: text(data, "coin") as CoinSymbol,
-      type: text(data, "type") as CryptoTransactionType,
-      date: text(data, "date"),
-      amount: Number(text(data, "amount")),
-      price: Number(text(data, "price")),
-      userId: chosenUser(data),
-    };
-    const result = await call(
+  const save = useSaveMutation(queries.cryptoTransactions, (json: Json) =>
+    request(
       editing
         ? api.crypto.transactions[":id"].$put({ param: { id: editing.id }, json })
         : api.crypto.transactions.$post({ json }),
-    );
+    ),
+  );
 
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setError(null);
-    if (!editing) form.reset();
-    onSaved(result.data);
-  };
+  const form = useAppForm({
+    defaultValues: {
+      userId: editing?.userId ?? "",
+      groupId: defaultGroup(me, editing?.groupId),
+      coin: editing?.coin ?? "",
+      type: editing?.type ?? "buy",
+      date: editing?.date ?? "",
+      amount: editing ? String(editing.amount) : "",
+      price: editing ? String(editing.price) : "",
+    },
+    onSubmit: async ({ value, formApi }) => {
+      try {
+        await save.mutateAsync({
+          groupId: value.groupId,
+          // The select only offers coins, and the browser makes sure one is picked.
+          coin: value.coin as CoinSymbol,
+          type: value.type,
+          date: value.date,
+          amount: Number(value.amount),
+          price: Number(value.price),
+          userId: value.userId || undefined,
+        });
+      } catch {
+        return; // shown from save.error
+      }
+      if (!editing) formApi.reset();
+      onSaved();
+    },
+  });
 
   return (
-    <>
-      <Message error={error} />
+    <form.AppForm>
+      <Message error={errorCode(save.error)} />
       <FormGrid
-        onSubmit={onSubmit}
+        onSubmit={submitWith(form)}
         actions={
           <>
-            <Button type="submit">{editing ? t("common.saveChanges") : t("transactions.add")}</Button>
+            <form.SubmitButton>{editing ? t("common.saveChanges") : t("transactions.add")}</form.SubmitButton>
             {editing && (
               <Button variant="secondary" onPress={onCancel}>
                 {t("common.cancel")}
@@ -73,30 +84,40 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
           </>
         }
       >
-        {me.role === "admin" && <UserSelect members={members} defaultValue={editing?.userId ?? ""} />}
-        <GroupSelect groups={groups} defaultValue={editing?.groupId} />
-        <SelectField
-          label={t("crypto.coin")}
-          name="coin"
-          isRequired
-          placeholder={t("crypto.selectCoin")}
-          defaultValue={editing?.coin ?? ""}
-          options={coinOptions.map(c => ({ id: c, label: `${c} – ${coinName(c)}` }))}
-        />
-        <SelectField
-          label={t("transactions.type")}
-          name="type"
-          isRequired
-          defaultValue={editing?.type ?? "buy"}
-          options={[
-            { id: "buy", label: t("type.buy") },
-            { id: "sell", label: t("type.sell") },
-          ]}
-        />
-        <Field label={t("common.date")} type="date" name="date" required defaultValue={editing?.date} />
-        <Field label={t("crypto.amount")} type="number" name="amount" required min="0" step="any" defaultValue={editing?.amount} />
-        <Field label={t("crypto.rate")} type="number" name="price" required min="0" step="any" defaultValue={editing?.price} />
+        {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
+        <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
+        <form.AppField name="coin">
+          {field => (
+            <field.SelectField
+              label={t("crypto.coin")}
+              isRequired
+              placeholder={t("crypto.selectCoin")}
+              options={coinOptions.map(c => ({ id: c, label: `${c} – ${coinName(c)}` }))}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="type">
+          {field => (
+            <field.SelectField
+              label={t("transactions.type")}
+              isRequired
+              options={[
+                { id: "buy", label: t("type.buy") },
+                { id: "sell", label: t("type.sell") },
+              ]}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="date">
+          {field => <field.TextField label={t("common.date")} type="date" required />}
+        </form.AppField>
+        <form.AppField name="amount">
+          {field => <field.TextField label={t("crypto.amount")} type="number" required min="0" step="any" />}
+        </form.AppField>
+        <form.AppField name="price">
+          {field => <field.TextField label={t("crypto.rate")} type="number" required min="0" step="any" />}
+        </form.AppField>
       </FormGrid>
-    </>
+    </form.AppForm>
   );
 }

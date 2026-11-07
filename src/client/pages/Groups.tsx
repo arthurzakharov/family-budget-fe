@@ -1,65 +1,80 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { api, call, load, text } from "@client/api";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, errorCode, request } from "@client/api";
+import { none, queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { Button, Table } from "@heroui/react";
-import { DataTable, Field, FormGrid, Message, PageHeader, Section, SelectField } from "@client/components/ui";
+import { submitWith, useAppForm } from "@client/components/form";
+import { DataTable, FormGrid, Message, PageHeader, Section } from "@client/components/ui";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
 export function Groups() {
   const { t } = useI18n();
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [users, setUsers] = useState<PublicUser[]>([]);
+  const qc = useQueryClient();
+  const groups = useQuery(queries.groups).data ?? none;
+  const users = useQuery(queries.users).data ?? none;
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    load(api.groups.$get(), setGroups);
-    load(api.users.$get(), setUsers);
-  }, []);
+  const create = useSaveMutation(queries.groups, (name: string) => request(api.groups.$post({ json: { name } })));
 
-  const onCreate = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const result = await call(api.groups.$post({ json: { name: text(new FormData(form), "name") } }));
-    if (!result.ok) return setError(result.error);
-    setError(null);
-    setGroups([...groups, result.data]);
-    form.reset();
-  };
-
-  // Membership lives on the user, so update the user's groupIds locally after the server agrees.
-  const setMember = async (group: Group, userId: string, member: boolean) => {
-    const result = await call(
-      member
-        ? api.groups[":id"].members.$post({ param: { id: group.id }, json: { userId } })
-        : api.groups[":id"].members[":userId"].$delete({ param: { id: group.id, userId } }),
-    );
-    if (!result.ok) return setError(result.error);
-    setError(null);
-    setUsers(
-      users.map(u =>
-        u.id !== userId
-          ? u
-          : { ...u, groupIds: member ? [...u.groupIds, group.id] : u.groupIds.filter(id => id !== group.id) },
+  // Membership lives on the user, so update the user's groupIds in the cache after the server agrees.
+  type Membership = { group: Group; userId: string; member: boolean };
+  const membership = useMutation({
+    mutationFn: ({ group, userId, member }: Membership) =>
+      request(
+        member
+          ? api.groups[":id"].members.$post({ param: { id: group.id }, json: { userId } })
+          : api.groups[":id"].members[":userId"].$delete({ param: { id: group.id, userId } }),
       ),
-    );
+    onSuccess: (_, { group, userId, member }) => {
+      qc.setQueryData<PublicUser[]>(queries.users.queryKey, cached =>
+        cached?.map(u =>
+          u.id !== userId
+            ? u
+            : { ...u, groupIds: member ? [...u.groupIds, group.id] : u.groupIds.filter(id => id !== group.id) },
+        ),
+      );
+      qc.invalidateQueries({ queryKey: queries.members.queryKey });
+    },
+  });
+
+  // Runs a change and shows its error, if any; true when it worked.
+  const run = async (change: Promise<unknown>) => {
+    try {
+      await change;
+    } catch (err) {
+      setError(errorCode(err));
+      return false;
+    }
+    setError(null);
+    return true;
   };
 
-  const onAdd = (e: FormEvent<HTMLFormElement>, group: Group) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const userId = text(new FormData(form), "userId");
-    form.reset();
-    return setMember(group, userId, true);
-  };
+  const createForm = useAppForm({
+    defaultValues: { name: "" },
+    onSubmit: async ({ value, formApi }) => {
+      if (await run(create.mutateAsync(value.name))) formApi.reset();
+    },
+  });
+
+  const setMember = (group: Group, userId: string, member: boolean) =>
+    run(membership.mutateAsync({ group, userId, member }));
 
   return (
     <>
       <PageHeader title={t("nav.groups")} />
 
       <Section title={t("groups.create")}>
-        <FormGrid onSubmit={onCreate} actions={<Button type="submit">{t("groups.create")}</Button>}>
-          <Field label={t("groups.name")} type="text" name="name" required />
-        </FormGrid>
+        <createForm.AppForm>
+          <FormGrid
+            onSubmit={submitWith(createForm)}
+            actions={<createForm.SubmitButton>{t("groups.create")}</createForm.SubmitButton>}
+          >
+            <createForm.AppField name="name">
+              {field => <field.TextField label={t("groups.name")} type="text" required />}
+            </createForm.AppField>
+          </FormGrid>
+        </createForm.AppForm>
       </Section>
 
       <Message error={error} />
@@ -96,21 +111,41 @@ export function Groups() {
                 ))}
               </DataTable>
               {others.length > 0 && (
-                <form onSubmit={e => onAdd(e, g)} className="mt-4 flex items-end gap-2">
-                  <SelectField
-                    label={t("auth.selectUser")}
-                    name="userId"
-                    isRequired
-                    placeholder={t("auth.selectUser")}
-                    options={others.map(u => ({ id: u.id, label: u.name }))}
-                  />
-                  <Button type="submit">{t("groups.add")}</Button>
-                </form>
+                <AddMemberForm users={others} onAdd={userId => setMember(g, userId, true)} />
               )}
             </Section>
           );
         })}
       </div>
     </>
+  );
+}
+
+// Picks a user who is not in the group yet and adds them.
+function AddMemberForm({ users, onAdd }: { users: PublicUser[]; onAdd: (userId: string) => Promise<boolean> }) {
+  const { t } = useI18n();
+  const form = useAppForm({
+    defaultValues: { userId: "" },
+    onSubmit: async ({ value, formApi }) => {
+      if (await onAdd(value.userId)) formApi.reset();
+    },
+  });
+
+  return (
+    <form.AppForm>
+      <form onSubmit={submitWith(form)} className="mt-4 flex items-end gap-2">
+        <form.AppField name="userId">
+          {field => (
+            <field.SelectField
+              label={t("auth.selectUser")}
+              isRequired
+              placeholder={t("auth.selectUser")}
+              options={users.map(u => ({ id: u.id, label: u.name }))}
+            />
+          )}
+        </form.AppField>
+        <form.SubmitButton>{t("groups.add")}</form.SubmitButton>
+      </form>
+    </form.AppForm>
   );
 }

@@ -22,7 +22,7 @@ import { General } from "@client/pages/deposit/General";
 import { GroupTab } from "@client/pages/deposit/GroupTab";
 import { Manage } from "@client/pages/deposit/Manage";
 import { canOpenGroupTab } from "@client/utils/access";
-import { api, call } from "@client/api";
+import { queries, queryClient } from "@client/queries";
 import { canEdit } from "@shared/roles";
 import { Settings } from "@client/pages/Settings";
 import { Users } from "@client/pages/Users";
@@ -92,8 +92,9 @@ async function groupTabGuard({ context, params }: { context: RouterContext; para
   if (context.auth.stage !== "user" || !canOpenGroupTab(context.auth.user, params.groupId)) {
     throw redirect({ to: "/" });
   }
-  const result = await call(api.groups.$get());
-  if (!result.ok || !result.data.some(g => g.id === params.groupId)) throw redirect({ to: "/" });
+  // The cached list when there is one, so opening a tab needs no request.
+  const groups = await queryClient.ensureQueryData(queries.groups).catch(() => []);
+  if (!groups.some(g => g.id === params.groupId)) throw redirect({ to: "/" });
 }
 
 // Adding and changing records: not for viewers.

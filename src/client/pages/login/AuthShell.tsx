@@ -1,8 +1,5 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from "react";
-import type { AuthStatus } from "@arthurzakharov/family-budget-be-client";
+import { createContext, useContext, type ReactNode } from "react";
 import { Button, Card, Spinner } from "@heroui/react";
-import type { JsonRequest } from "@client/api";
-import { useAuth } from "@client/context/auth";
 import { useI18n } from "@client/context/i18n";
 import { useTheme } from "@client/context/theme";
 import logoLight from "@client/assets/logos/familienbudget-light.svg";
@@ -77,28 +74,4 @@ export function AuthActions({ forward, back }: { forward: AuthAction; back: Auth
       </Button>
     </div>
   );
-}
-
-// Sends an auth request and tracks it for the card: `isLoading` while it runs (pass it to
-// AuthShell), then `error` with the failure's code. A second submit while one runs is ignored.
-export function useAuthRequest() {
-  const { send } = useAuth();
-  const [isLoading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const running = useRef(false);
-
-  const submit = async (request: () => JsonRequest<AuthStatus>) => {
-    if (running.current) return;
-    running.current = true;
-    setLoading(true);
-    setError(null);
-    try {
-      setError(await send(request()));
-    } finally {
-      running.current = false;
-      setLoading(false);
-    }
-  };
-
-  return { isLoading, error, setError, submit };
 }

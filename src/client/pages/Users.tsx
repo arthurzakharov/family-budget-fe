@@ -1,85 +1,82 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { api, call, load, text } from "@client/api";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api, errorCode, request } from "@client/api";
+import { none, queries, useDeleteMutation, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
-import { RoleAndGroupFields } from "@client/components/users/RoleAndGroupFields";
+import { submitWith, useAppForm } from "@client/components/form";
+import { GroupCheckboxes, RoleSelect, type AssignableRole } from "@client/components/users/RoleAndGroupFields";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
 import { Button, Chip, Input, Table } from "@heroui/react";
-import { DataTable, editingRow, Field, FormGrid, Message, PageHeader, RowActions, Section } from "@client/components/ui";
+import { DataTable, editingRow, FormGrid, Message, PageHeader, RowActions, Section } from "@client/components/ui";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
-// The role and groups picked in RoleAndGroupFields. The backend rejects any other role.
-const roleAndGroups = (data: FormData) => ({
-  role: text(data, "role") as "contributor" | "viewer",
-  groupIds: data.getAll("groupIds").filter(id => typeof id === "string"),
-});
+type NewUser = Parameters<typeof api.users.$post>[0]["json"];
+type RoleAndGroups = { role: AssignableRole; groupIds: string[] };
 
 // What the admin is changing in a user's row.
 type Editing = { id: string; field: "password" | "roleAndGroups" };
-
 export function Users() {
   const { t } = useI18n();
   const me = useCurrentUser();
-  const [users, setUsers] = useState<PublicUser[]>([]);
-  const [groups, setGroups] = useState<Group[] | null>(null);
+  const users = useQuery(queries.users).data ?? none;
+  // undefined while loading, so the create form only says "make a group first" once it knows.
+  const groups = useQuery(queries.groups).data;
   const [editing, setEditing] = useState<Editing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    load(api.users.$get(), setUsers);
-    load(api.groups.$get(), setGroups);
-  }, []);
+  // Users are also the members listed on the money pages, so those are fetched again after a change.
+  const options = { invalidates: [queries.members.queryKey] };
+  const create = useSaveMutation(
+    queries.users,
+    (json: NewUser) => request(api.users.$post({ json })),
+    options,
+  );
+  const update = useSaveMutation(
+    queries.users,
+    ({ id, json }: { id: string; json: RoleAndGroups }) =>
+      request(api.users[":id"].$put({ param: { id }, json })),
+    options,
+  );
+  const remove = useDeleteMutation(queries.users, id => request(api.users[":id"].$delete({ param: { id } })), options);
+  const changePassword = useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      request(api.users[":id"].password.$put({ param: { id }, json: { password } })),
+  });
 
   const groupNames = (user: PublicUser) =>
     user.groupIds.map(id => groups?.find(g => g.id === id)?.name ?? "?").join(", ") || "–";
 
-  const report = (errorCode: string | null, messageKey: string | null = null) => {
-    setError(errorCode);
+  const report = (errorKey: string | null, messageKey: string | null = null) => {
+    setError(errorKey);
     setMessage(messageKey);
   };
 
-  const onCreate = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const data = new FormData(form);
-    const result = await call(
-      api.users.$post({
-        json: { name: text(data, "name"), password: text(data, "password"), ...roleAndGroups(data) },
-      }),
-    );
-    if (!result.ok) return report(result.error);
-    setUsers([...users, result.data]);
-    form.reset();
-    report(null, "users.created");
+  // Runs a change and reports how it went; true when it worked.
+  const run = async (change: Promise<unknown>, messageKey: string) => {
+    try {
+      await change;
+    } catch (err) {
+      report(errorCode(err));
+      return false;
+    }
+    report(null, messageKey);
+    return true;
   };
 
-  const onChangePassword = async (e: FormEvent<HTMLFormElement>, user: PublicUser) => {
-    e.preventDefault();
-    const password = text(new FormData(e.currentTarget), "password");
-    const result = await call(api.users[":id"].password.$put({ param: { id: user.id }, json: { password } }));
-    if (!result.ok) return report(result.error);
-    setEditing(null);
-    report(null, "users.passwordChanged");
-  };
+  // Each form gets one of these; it resolves to true when the change worked.
+  const onCreate = (json: NewUser) => run(create.mutateAsync(json), "users.created");
 
-  const onChangeRoleAndGroups = async (e: FormEvent<HTMLFormElement>, user: PublicUser) => {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    const result = await call(api.users[":id"].$put({ param: { id: user.id }, json: roleAndGroups(data) }));
-    if (!result.ok) return report(result.error);
-    const updated = result.data;
-    setUsers(users.map(u => (u.id === updated.id ? updated : u)));
-    setEditing(null);
-    report(null, "users.updated");
-  };
+  const onChangePassword = async (user: PublicUser, password: string) =>
+    (await run(changePassword.mutateAsync({ id: user.id, password }), "users.passwordChanged")) && setEditing(null);
+
+  const onChangeRoleAndGroups = async (user: PublicUser, json: RoleAndGroups) =>
+    (await run(update.mutateAsync({ id: user.id, json }), "users.updated")) && setEditing(null);
 
   const onDelete = async (user: PublicUser) => {
     if (!confirm(t("users.confirmDelete", { name: user.name }))) return;
-    const result = await call(api.users[":id"].$delete({ param: { id: user.id } }));
-    if (!result.ok) return report(result.error);
-    setUsers(users.filter(u => u.id !== user.id));
-    report(null, "users.deleted");
+    await run(remove.mutateAsync(user.id), "users.deleted");
   };
 
   const isEditing = (user: PublicUser, field: Editing["field"]) => editing?.id === user.id && editing.field === field;
@@ -91,18 +88,7 @@ export function Users() {
       <Section title={t("users.create")} description={groups?.length === 0 ? t("users.noGroupsHint") : undefined}>
         {/* A user must belong to a group, so the form is disabled until one exists. */}
         <fieldset disabled={!groups?.length} className="min-w-0">
-          <FormGrid onSubmit={onCreate} actions={<Button type="submit">{t("users.create")}</Button>}>
-            <Field label={t("users.name")} type="text" name="name" required />
-            <Field
-              label={t("auth.password")}
-              type="password"
-              name="password"
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-            />
-            <RoleAndGroupFields groups={groups ?? []} />
-          </FormGrid>
+          <CreateUserForm groups={groups ?? []} onCreate={onCreate} />
         </fieldset>
       </Section>
 
@@ -134,37 +120,14 @@ export function Users() {
               <Table.Cell>{groupNames(u)}</Table.Cell>
               <Table.Cell>
                 {isEditing(u, "password") ? (
-                  <form onSubmit={e => onChangePassword(e, u)} className="flex items-end justify-end gap-2">
-                    <Input
-                      variant="secondary"
-                      className="h-8"
-                      type="password"
-                      name="password"
-                      required
-                      minLength={MIN_PASSWORD_LENGTH}
-                      autoComplete="new-password"
-                      placeholder={t("users.newPassword")}
-                      aria-label={t("users.newPassword")}
-                    />
-                    <Button size="sm" type="submit">
-                      {t("common.saveChanges")}
-                    </Button>
-                    <Button size="sm" variant="secondary" onPress={() => setEditing(null)}>
-                      {t("common.cancel")}
-                    </Button>
-                  </form>
+                  <PasswordForm onSave={password => onChangePassword(u, password)} onCancel={() => setEditing(null)} />
                 ) : isEditing(u, "roleAndGroups") ? (
-                  <form onSubmit={e => onChangeRoleAndGroups(e, u)} className="flex min-w-64 flex-col gap-3">
-                    <RoleAndGroupFields groups={groups ?? []} user={u} />
-                    <div className="flex gap-2">
-                      <Button size="sm" type="submit">
-                        {t("common.saveChanges")}
-                      </Button>
-                      <Button size="sm" variant="secondary" onPress={() => setEditing(null)}>
-                        {t("common.cancel")}
-                      </Button>
-                    </div>
-                  </form>
+                  <RoleAndGroupsForm
+                    user={u}
+                    groups={groups ?? []}
+                    onSave={json => onChangeRoleAndGroups(u, json)}
+                    onCancel={() => setEditing(null)}
+                  />
                 ) : (
                   <RowActions
                     // The admin's role and groups are fixed, and the admin cannot be deleted.
@@ -189,5 +152,113 @@ export function Users() {
         </DataTable>
       </Section>
     </>
+  );
+}
+
+// A new user's name, password, role and groups. Empties itself once the user is created.
+function CreateUserForm({ groups, onCreate }: { groups: Group[]; onCreate: (json: NewUser) => Promise<boolean> }) {
+  const { t } = useI18n();
+  const form = useAppForm({
+    defaultValues: { name: "", password: "", role: "" as AssignableRole | "", groupIds: [] as string[] },
+    onSubmit: async ({ value, formApi }) => {
+      // The browser makes sure a role is picked.
+      if (await onCreate({ ...value, role: value.role as AssignableRole })) formApi.reset();
+    },
+  });
+
+  return (
+    <form.AppForm>
+      <FormGrid onSubmit={submitWith(form)} actions={<form.SubmitButton>{t("users.create")}</form.SubmitButton>}>
+        <form.AppField name="name">{field => <field.TextField label={t("users.name")} type="text" required />}</form.AppField>
+        <form.AppField name="password">
+          {field => (
+            <field.TextField
+              label={t("auth.password")}
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
+        <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
+      </FormGrid>
+    </form.AppForm>
+  );
+}
+
+// A new password for a user, typed in their row.
+function PasswordForm({ onSave, onCancel }: { onSave: (password: string) => Promise<unknown>; onCancel: () => void }) {
+  const { t } = useI18n();
+  const form = useAppForm({
+    defaultValues: { password: "" },
+    onSubmit: ({ value }) => onSave(value.password),
+  });
+
+  return (
+    <form.AppForm>
+      <form onSubmit={submitWith(form)} className="flex items-end justify-end gap-2">
+        <form.Field name="password">
+          {field => (
+            <Input
+              variant="secondary"
+              className="h-8"
+              type="password"
+              name={field.name}
+              value={field.state.value}
+              onChange={e => field.handleChange(e.target.value)}
+              onBlur={field.handleBlur}
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+              placeholder={t("users.newPassword")}
+              aria-label={t("users.newPassword")}
+            />
+          )}
+        </form.Field>
+        <form.SubmitButton size="sm">{t("common.saveChanges")}</form.SubmitButton>
+        <Button size="sm" variant="secondary" onPress={onCancel}>
+          {t("common.cancel")}
+        </Button>
+      </form>
+    </form.AppForm>
+  );
+}
+
+// A user's role and groups, changed in their row.
+function RoleAndGroupsForm({
+  user,
+  groups,
+  onSave,
+  onCancel,
+}: {
+  user: PublicUser;
+  groups: Group[];
+  onSave: (json: RoleAndGroups) => Promise<unknown>;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const form = useAppForm({
+    // Only users other than the admin have this form.
+    defaultValues: { role: user.role as AssignableRole, groupIds: user.groupIds },
+    onSubmit: ({ value }) => onSave(value),
+  });
+
+  return (
+    <form.AppForm>
+      <form onSubmit={submitWith(form)} className="flex min-w-64 flex-col gap-3">
+        <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
+        <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
+        <div className="flex gap-2">
+          <form.SubmitButton size="sm" requireChange>
+            {t("common.saveChanges")}
+          </form.SubmitButton>
+          <Button size="sm" variant="secondary" onPress={onCancel}>
+            {t("common.cancel")}
+          </Button>
+        </div>
+      </form>
+    </form.AppForm>
   );
 }

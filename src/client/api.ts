@@ -35,20 +35,24 @@ export async function call<R extends AnyResponse>(request: Promise<R>): Promise<
   return { ok: false, error: body?.code ?? "errors.unknown" };
 }
 
-// Loads data that a page cannot show without; failures leave the current value as it is.
-export async function load<R extends AnyResponse>(request: Promise<R>, set: (data: Data<R>) => void) {
-  const result = await call(request);
-  if (result.ok) set(result.data);
+// Like `call`, but throws an ApiError instead of returning a failure. TanStack Query and
+// TanStack Form expect failures to be thrown.
+export async function request<R extends AnyResponse>(req: Promise<R>): Promise<Data<R>> {
+  const result = await call(req);
+  if (!result.ok) throw new ApiError(result.error);
+  return result.data;
 }
 
-// A form field as text; missing fields are "".
-export const text = (data: FormData, name: string) => {
-  const value = data.get(name);
-  return typeof value === "string" ? value : "";
-};
+// A failed request; `code` is the translation key of the reason.
+export class ApiError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+  }
+}
 
-// The admin's choice of user in record forms; other users have no such field.
-export const chosenUser = (data: FormData) => text(data, "userId") || undefined;
+// The translation key to show for a failed query or mutation, or null when there is none.
+export const errorCode = (error: unknown) =>
+  error == null ? null : error instanceof ApiError ? error.code : "errors.unknown";
 
 // Euros typed into a form, as whole cents.
 export const toCents = (euros: string) => Math.round(Number(euros) * 100);
