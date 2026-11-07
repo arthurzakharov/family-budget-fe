@@ -1,6 +1,6 @@
-import { Table } from "@heroui/react";
+import { useMemo } from "react";
 import { useI18n } from "@client/context/i18n";
-import { DataTable, Money } from "@client/components/ui";
+import { moneyColumn, RecordTable, recordColumns } from "@client/components/RecordTable";
 import { formatCents, nameOf } from "@client/utils/format";
 import type { EntrySummary } from "@shared/expenses";
 import type { Group } from "@arthurzakharov/family-budget-be-client";
@@ -11,39 +11,29 @@ type Props = {
   groups: Group[];
 };
 
+type Row = { id: string; name: string; income: number; expenses: number; net: number };
+
+const column = recordColumns<Row>();
+
 // Per group: income, expenses and what is left.
 export function GroupTotalsTable({ summary, groupIds, groups }: Props) {
   const { t } = useI18n();
 
-  return (
-    <DataTable
-      label={t("perGroup.title")}
-      columns={
-        <>
-          <Table.Column isRowHeader>{t("transactions.group")}</Table.Column>
-          <Table.Column>{t("expenses.income")}</Table.Column>
-          <Table.Column>{t("expenses.expenses")}</Table.Column>
-          <Table.Column>{t("expenses.net")}</Table.Column>
-        </>
-      }
-    >
-      {groupIds.map(id => {
-        const g = summary.byGroup[id] ?? { income: 0, expenses: 0, net: 0 };
-        return (
-          <Table.Row key={id} id={id}>
-            <Table.Cell>{nameOf(groups, id)}</Table.Cell>
-            <Table.Cell>
-              <Money cents={g.income} format={formatCents} />
-            </Table.Cell>
-            <Table.Cell>
-              <Money cents={g.expenses} format={formatCents} />
-            </Table.Cell>
-            <Table.Cell>
-              <Money cents={g.net} format={formatCents} signed />
-            </Table.Cell>
-          </Table.Row>
-        );
-      })}
-    </DataTable>
+  const rows = useMemo(
+    () =>
+      groupIds.map((id): Row => ({ id, name: nameOf(groups, id), ...(summary.byGroup[id] ?? { income: 0, expenses: 0, net: 0 }) })),
+    [summary, groupIds, groups],
   );
+
+  const columns = useMemo(
+    () => [
+      column.accessor("name", { header: t("transactions.group"), enableSorting: true, sortFn: "text", meta: { isRowHeader: true } }),
+      column.accessor("income", moneyColumn(t("expenses.income"), formatCents)),
+      column.accessor("expenses", moneyColumn(t("expenses.expenses"), formatCents)),
+      column.accessor("net", moneyColumn(t("expenses.net"), formatCents, true)),
+    ],
+    [t],
+  );
+
+  return <RecordTable label={t("perGroup.title")} data={rows} columns={columns} getRowId={row => row.id} paged={false} />;
 }

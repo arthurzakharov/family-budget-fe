@@ -4,10 +4,13 @@ import { queries, useReplaceMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { categoryKinds } from "@shared/expenses";
-import { Chip, Switch, Table } from "@heroui/react";
+import { Chip, Switch } from "@heroui/react";
 import { submitWith, useAppForm } from "@client/components/form";
-import { DataTable, FormGrid, Message, Section } from "@client/components/ui";
+import { FormGrid, Message, Section } from "@client/components/ui";
+import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Category, CategoryKind } from "@arthurzakharov/family-budget-be-client";
+
+const column = recordColumns<Category>();
 
 // Admin only: show or hide categories, and create new ones in either list.
 // Hidden categories cannot be picked for new records; existing records keep theirs.
@@ -40,41 +43,49 @@ export function Categories() {
     },
   });
 
+  const columns = [
+    column.accessor(c => categoryName(t, c.id), {
+      id: "name",
+      header: t("expenses.category"),
+      enableSorting: true,
+      sortFn: "text",
+      meta: { isRowHeader: true },
+      cell: ({ row: { original: c }, getValue }) => (
+        <>
+          <span className={c.hidden ? "text-muted line-through" : ""}>{getValue()}</span>
+          {c.name !== null && (
+            <Chip size="sm" variant="soft" className="ml-2">
+              {t("expenses.custom")}
+            </Chip>
+          )}
+        </>
+      ),
+    }),
+    column.display({
+      id: "visible",
+      header: t("expenses.visible"),
+      meta: { headerClassName: "w-24" },
+      cell: ({ row: { original: c } }) => (
+        <Switch aria-label={categoryName(t, c.id)} isSelected={!c.hidden} onChange={visible => toggle(c, visible)}>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+        </Switch>
+      ),
+    }),
+  ];
+
   const list = (kind: CategoryKind) => {
     const title = t(kind === "income" ? "expenses.incomeCategories" : "expenses.expenseCategories");
     return (
       <Section title={title}>
-        <DataTable
+        <RecordTable
           label={title}
-          columns={
-            <>
-              <Table.Column isRowHeader>{t("expenses.category")}</Table.Column>
-              <Table.Column className="w-24">{t("expenses.visible")}</Table.Column>
-            </>
-          }
-        >
-          {categories
-            .filter(c => c.kind === kind)
-            .map(c => (
-              <Table.Row key={c.id} id={c.id}>
-                <Table.Cell>
-                  <span className={c.hidden ? "text-muted line-through" : ""}>{categoryName(t, c.id)}</span>
-                  {c.name !== null && (
-                    <Chip size="sm" variant="soft" className="ml-2">
-                      {t("expenses.custom")}
-                    </Chip>
-                  )}
-                </Table.Cell>
-                <Table.Cell>
-                  <Switch aria-label={categoryName(t, c.id)} isSelected={!c.hidden} onChange={visible => toggle(c, visible)}>
-                    <Switch.Control>
-                      <Switch.Thumb />
-                    </Switch.Control>
-                  </Switch>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-        </DataTable>
+          data={categories.filter(c => c.kind === kind)}
+          columns={columns}
+          getRowId={c => c.id}
+          paged={false}
+        />
       </Section>
     );
   };

@@ -7,8 +7,9 @@ import { useCurrentUser } from "@client/context/auth";
 import { submitWith, useAppForm } from "@client/components/form";
 import { GroupCheckboxes, RoleSelect, type AssignableRole } from "@client/components/users/RoleAndGroupFields";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
-import { Button, Chip, Input, Table } from "@heroui/react";
-import { DataTable, editingRow, FormGrid, Message, PageHeader, RowActions, Section } from "@client/components/ui";
+import { Button, Chip, Input } from "@heroui/react";
+import { editingRow, FormGrid, Message, PageHeader, RowActions, Section } from "@client/components/ui";
+import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
 type NewUser = Parameters<typeof api.users.$post>[0]["json"];
@@ -16,6 +17,8 @@ type RoleAndGroups = { role: AssignableRole; groupIds: string[] };
 
 // What the admin is changing in a user's row.
 type Editing = { id: string; field: "password" | "roleAndGroups" };
+
+const column = recordColumns<PublicUser>();
 export function Users() {
   const { t } = useI18n();
   const me = useCurrentUser();
@@ -81,6 +84,66 @@ export function Users() {
 
   const isEditing = (user: PublicUser, field: Editing["field"]) => editing?.id === user.id && editing.field === field;
 
+  const columns = [
+    column.accessor("name", {
+      header: t("users.name"),
+      enableSorting: true,
+      sortFn: "text",
+      meta: { isRowHeader: true },
+      cell: ({ row, getValue }) => (
+        <>
+          <span className="font-medium">{getValue()}</span>
+          {row.original.id === me.id && <span className="text-muted"> ({t("users.you")})</span>}
+        </>
+      ),
+    }),
+    column.accessor(u => t(`role.${u.role}`), {
+      id: "role",
+      header: t("users.role"),
+      enableSorting: true,
+      sortFn: "text",
+      cell: ({ row, getValue }) => (
+        <Chip size="sm" variant="soft" color={row.original.role === "admin" ? "accent" : "default"}>
+          {getValue()}
+        </Chip>
+      ),
+    }),
+    column.accessor(groupNames, { id: "groups", header: t("users.groups"), enableSorting: true, sortFn: "text" }),
+    column.display({
+      id: "actions",
+      header: " ",
+      meta: { ariaLabel: t("common.edit") },
+      cell: ({ row: { original: u } }) =>
+        isEditing(u, "password") ? (
+          <PasswordForm onSave={password => onChangePassword(u, password)} onCancel={() => setEditing(null)} />
+        ) : isEditing(u, "roleAndGroups") ? (
+          <RoleAndGroupsForm
+            user={u}
+            groups={groups ?? []}
+            onSave={json => onChangeRoleAndGroups(u, json)}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <RowActions
+            // The admin's role and groups are fixed, and the admin cannot be deleted.
+            onDelete={u.role !== "admin" ? () => onDelete(u) : undefined}
+            extra={
+              <>
+                <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "password" })}>
+                  {t("users.changePassword")}
+                </Button>
+                {u.role !== "admin" && (
+                  <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "roleAndGroups" })}>
+                    {t("users.editRoleAndGroups")}
+                  </Button>
+                )}
+              </>
+            }
+          />
+        ),
+    }),
+  ];
+
   return (
     <>
       <PageHeader title={t("nav.users")} />
@@ -95,61 +158,14 @@ export function Users() {
       <Message error={error} success={message} />
 
       <Section>
-        <DataTable
+        <RecordTable
           label={t("nav.users")}
-          columns={
-            <>
-              <Table.Column isRowHeader>{t("users.name")}</Table.Column>
-              <Table.Column>{t("users.role")}</Table.Column>
-              <Table.Column>{t("users.groups")}</Table.Column>
-              <Table.Column aria-label={t("common.edit")}> </Table.Column>
-            </>
-          }
-        >
-          {users.map(u => (
-            <Table.Row key={u.id} id={u.id} className={editingRow(editing?.id === u.id)}>
-              <Table.Cell>
-                <span className="font-medium">{u.name}</span>
-                {u.id === me.id && <span className="text-muted"> ({t("users.you")})</span>}
-              </Table.Cell>
-              <Table.Cell>
-                <Chip size="sm" variant="soft" color={u.role === "admin" ? "accent" : "default"}>
-                  {t(`role.${u.role}`)}
-                </Chip>
-              </Table.Cell>
-              <Table.Cell>{groupNames(u)}</Table.Cell>
-              <Table.Cell>
-                {isEditing(u, "password") ? (
-                  <PasswordForm onSave={password => onChangePassword(u, password)} onCancel={() => setEditing(null)} />
-                ) : isEditing(u, "roleAndGroups") ? (
-                  <RoleAndGroupsForm
-                    user={u}
-                    groups={groups ?? []}
-                    onSave={json => onChangeRoleAndGroups(u, json)}
-                    onCancel={() => setEditing(null)}
-                  />
-                ) : (
-                  <RowActions
-                    // The admin's role and groups are fixed, and the admin cannot be deleted.
-                    onDelete={u.role !== "admin" ? () => onDelete(u) : undefined}
-                    extra={
-                      <>
-                        <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "password" })}>
-                          {t("users.changePassword")}
-                        </Button>
-                        {u.role !== "admin" && (
-                          <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "roleAndGroups" })}>
-                            {t("users.editRoleAndGroups")}
-                          </Button>
-                        )}
-                      </>
-                    }
-                  />
-                )}
-              </Table.Cell>
-            </Table.Row>
-          ))}
-        </DataTable>
+          data={users}
+          columns={columns}
+          getRowId={u => u.id}
+          rowClassName={u => editingRow(editing?.id === u.id)}
+          paged={false}
+        />
       </Section>
     </>
   );

@@ -1,6 +1,7 @@
-import { Table } from "@heroui/react";
+import { useMemo } from "react";
 import { useI18n } from "@client/context/i18n";
-import { DataTable, editingRow, RowActions } from "@client/components/ui";
+import { editingRow, RowActions } from "@client/components/ui";
+import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import { addedBy } from "@client/utils/format";
 import type { DepositRate, Member } from "@arthurzakharov/family-budget-be-client";
 
@@ -12,38 +13,59 @@ type Props = {
   editingId?: string | null;
 };
 
+const column = recordColumns<DepositRate>();
+
+// The deposit's rate periods, oldest first.
 export function RateTable({ rates, members, onEdit, editingId }: Props) {
   const { t } = useI18n();
-  // "From the beginning" sorts first.
-  const sorted = [...rates].sort((a, b) => (a.from ?? "").localeCompare(b.from ?? ""));
+
+  const columns = useMemo(
+    () => [
+      column.accessor("ratePercent", {
+        header: t("rates.rate"),
+        enableSorting: true,
+        sortFn: "basic",
+        meta: { isRowHeader: true, className: "tabular-nums" },
+      }),
+      // "From the beginning" is sorted as "" so it comes first.
+      column.accessor(r => r.from ?? "", {
+        id: "from",
+        header: t("rates.from"),
+        enableSorting: true,
+        sortFn: "basic",
+        cell: ({ row }) => row.original.from ?? t("rates.beginning"),
+        meta: { className: "whitespace-nowrap" },
+      }),
+      column.accessor("till", {
+        header: t("rates.till"),
+        cell: ({ getValue }) => getValue() ?? t("rates.current"),
+        meta: { className: "whitespace-nowrap" },
+      }),
+      column.display({ id: "addedBy", header: t("common.addedBy"), cell: ({ row }) => addedBy(members, row.original.userId, t) }),
+      ...(onEdit
+        ? [
+            column.display({
+              id: "actions",
+              header: " ",
+              meta: { ariaLabel: t("common.edit") },
+              cell: ({ row }) => <RowActions onEdit={() => onEdit(row.original)} />,
+            }),
+          ]
+        : []),
+    ],
+    [t, members, onEdit],
+  );
 
   return (
-    <DataTable
+    <RecordTable
       label={t("rates.title")}
       emptyText={t("rates.empty")}
-      columns={
-        <>
-          <Table.Column isRowHeader>{t("rates.rate")}</Table.Column>
-          <Table.Column>{t("rates.from")}</Table.Column>
-          <Table.Column>{t("rates.till")}</Table.Column>
-          <Table.Column>{t("common.addedBy")}</Table.Column>
-          {onEdit && <Table.Column aria-label={t("common.edit")}> </Table.Column>}
-        </>
-      }
-    >
-      {sorted.map(r => (
-        <Table.Row key={r.id} id={r.id} className={editingRow(r.id === editingId)}>
-          <Table.Cell className="tabular-nums">{r.ratePercent}</Table.Cell>
-          <Table.Cell className="whitespace-nowrap">{r.from ?? t("rates.beginning")}</Table.Cell>
-          <Table.Cell className="whitespace-nowrap">{r.till ?? t("rates.current")}</Table.Cell>
-          <Table.Cell>{addedBy(members, r.userId, t)}</Table.Cell>
-          {onEdit && (
-            <Table.Cell>
-              <RowActions onEdit={() => onEdit(r)} />
-            </Table.Cell>
-          )}
-        </Table.Row>
-      ))}
-    </DataTable>
+      data={rates}
+      columns={columns}
+      getRowId={r => r.id}
+      rowClassName={r => editingRow(r.id === editingId)}
+      initialSorting={[{ id: "from", desc: false }]}
+      paged={false}
+    />
   );
 }

@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { queries, useReplaceMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
-import { Table } from "@heroui/react";
 import { submitWith, useAppForm } from "@client/components/form";
-import { CheckboxField, DataTable, Message, Section } from "@client/components/ui";
+import { CheckboxField, Message, Section } from "@client/components/ui";
+import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import { COINS } from "@shared/crypto";
 import type { CoinSymbol } from "@arthurzakharov/family-budget-be-client";
+
+const column = recordColumns<(typeof COINS)[number]>();
 
 // Admin only: which coins can be picked for new records. Existing records keep their coin.
 export function Coins() {
@@ -50,19 +52,15 @@ function CoinsForm({ coins }: { coins: CoinSymbol[] }) {
       <form onSubmit={submitWith(form)} className="flex flex-col gap-4">
         <form.Field name="enabled" listeners={{ onChange: () => setNotice(null) }}>
           {field => (
-            <DataTable
+            <RecordTable
               label={t("crypto.coins")}
-              columns={
-                <>
-                  <Table.Column className="w-24">{t("crypto.available")}</Table.Column>
-                  <Table.Column isRowHeader>{t("crypto.coin")}</Table.Column>
-                  <Table.Column>{t("crypto.name")}</Table.Column>
-                </>
-              }
-            >
-              {COINS.map(c => (
-                <Table.Row key={c.symbol} id={c.symbol}>
-                  <Table.Cell>
+              data={COINS}
+              columns={[
+                column.display({
+                  id: "available",
+                  header: t("crypto.available"),
+                  meta: { headerClassName: "w-24" },
+                  cell: ({ row: { original: c } }) => (
                     <CheckboxField
                       label=""
                       aria-label={c.name}
@@ -73,12 +71,19 @@ function CoinsForm({ coins }: { coins: CoinSymbol[] }) {
                         )
                       }
                     />
-                  </Table.Cell>
-                  <Table.Cell className="font-medium">{c.symbol}</Table.Cell>
-                  <Table.Cell>{c.name}</Table.Cell>
-                </Table.Row>
-              ))}
-            </DataTable>
+                  ),
+                }),
+                column.accessor("symbol", {
+                  header: t("crypto.coin"),
+                  enableSorting: true,
+                  sortFn: "text",
+                  meta: { isRowHeader: true, className: "font-medium" },
+                }),
+                column.accessor("name", { header: t("crypto.name"), enableSorting: true, sortFn: "text" }),
+              ]}
+              getRowId={c => c.symbol}
+              paged={false}
+            />
           )}
         </form.Field>
         <div>

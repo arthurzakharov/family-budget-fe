@@ -3,10 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
-import { Button, Table } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { submitWith, useAppForm } from "@client/components/form";
-import { DataTable, FormGrid, Message, PageHeader, Section } from "@client/components/ui";
+import { FormGrid, Message, PageHeader, Section } from "@client/components/ui";
+import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
+
+const column = recordColumns<PublicUser>();
 
 export function Groups() {
   const { t } = useI18n();
@@ -60,6 +63,23 @@ export function Groups() {
   const setMember = (group: Group, userId: string, member: boolean) =>
     run(membership.mutateAsync({ group, userId, member }));
 
+  // The members of a group, each with a button to take them out of it.
+  const memberColumns = (group: Group) => [
+    column.accessor("name", { header: t("users.name"), enableSorting: true, sortFn: "text", meta: { isRowHeader: true } }),
+    column.display({
+      id: "remove",
+      header: " ",
+      meta: { ariaLabel: t("groups.remove") },
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <Button size="sm" variant="danger-soft" onPress={() => setMember(group, row.original.id, false)}>
+            {t("groups.remove")}
+          </Button>
+        </div>
+      ),
+    }),
+  ];
+
   return (
     <>
       <PageHeader title={t("nav.groups")} />
@@ -87,29 +107,14 @@ export function Groups() {
           const others = users.filter(u => u.role !== "admin" && !u.groupIds.includes(g.id));
           return (
             <Section key={g.id} title={g.name}>
-              <DataTable
+              <RecordTable
                 label={g.name}
                 emptyText={t("groups.noMembers")}
-                columns={
-                  <>
-                    <Table.Column isRowHeader>{t("users.name")}</Table.Column>
-                    <Table.Column aria-label={t("groups.remove")}> </Table.Column>
-                  </>
-                }
-              >
-                {members.map(u => (
-                  <Table.Row key={u.id} id={u.id}>
-                    <Table.Cell>{u.name}</Table.Cell>
-                    <Table.Cell>
-                      <div className="flex justify-end">
-                        <Button size="sm" variant="danger-soft" onPress={() => setMember(g, u.id, false)}>
-                          {t("groups.remove")}
-                        </Button>
-                      </div>
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </DataTable>
+                data={members}
+                columns={memberColumns(g)}
+                getRowId={u => u.id}
+                paged={false}
+              />
               {others.length > 0 && (
                 <AddMemberForm users={others} onAdd={userId => setMember(g, userId, true)} />
               )}

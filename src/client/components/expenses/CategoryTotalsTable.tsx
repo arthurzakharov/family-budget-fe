@@ -1,57 +1,63 @@
-import { Table } from "@heroui/react";
+import { useMemo } from "react";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
-import { DataTable, Money } from "@client/components/ui";
+import { Money } from "@client/components/ui";
+import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import { formatCents } from "@client/utils/format";
 import { kindOf, type EntrySummary } from "@shared/expenses";
 import type { CategoryKind } from "@arthurzakharov/family-budget-be-client";
 
-// Income and expenses per category, largest first, with the totals and what is left.
+// A bold subtotal ("total") or one category under it.
+type Row = { id: string; label: string; cents: number; isTotal: boolean; signed: boolean };
+
+const column = recordColumns<Row>();
+
+// Income and expenses per category, largest first, each list under its subtotal, then what is
+// left. The rows are grouped, so the table is not sortable.
 export function CategoryTotalsTable({ summary }: { summary: EntrySummary }) {
   const { t } = useI18n();
   const { categories } = useExpenses();
   const categoryName = useCategoryName();
 
-  const rows = (kind: CategoryKind) =>
+  const categoryRows = (kind: CategoryKind): Row[] =>
     Object.entries(summary.byCategory)
       .filter(([id]) => kindOf(categories, id) === kind)
       .sort(([, a], [, b]) => b - a)
-      .map(([id, amount]) => (
-        <Table.Row key={`${kind}-${id}`} id={`${kind}-${id}`}>
-          <Table.Cell className="pl-6">{categoryName(t, id)}</Table.Cell>
-          <Table.Cell>
-            <Money cents={amount} format={formatCents} />
-          </Table.Cell>
-        </Table.Row>
-      ));
+      .map(([id, cents]) => ({ id: `${kind}-${id}`, label: categoryName(t, id), cents, isTotal: false, signed: false }));
 
-  // A bold subtotal row heading each list.
-  const total = (id: string, label: string, cents: number, signed?: boolean) => (
-    <Table.Row key={id} id={id} className="[&>td]:font-semibold">
-      <Table.Cell>{label}</Table.Cell>
-      <Table.Cell>
-        <Money cents={cents} format={formatCents} signed={signed} />
-      </Table.Cell>
-    </Table.Row>
+  const total = (id: string, label: string, cents: number, signed = false): Row => ({ id, label, cents, isTotal: true, signed });
+
+  const rows = [
+    total("income", t("expenses.income"), summary.income),
+    ...categoryRows("income"),
+    total("expense", t("expenses.expenses"), summary.expenses),
+    ...categoryRows("expense"),
+    total("net", t("expenses.net"), summary.net, true),
+  ];
+
+  const columns = useMemo(
+    () => [
+      column.accessor("label", {
+        header: t("expenses.category"),
+        meta: { isRowHeader: true },
+        cell: ({ row, getValue }) => <span className={row.original.isTotal ? undefined : "pl-4"}>{getValue()}</span>,
+      }),
+      column.accessor("cents", {
+        header: t("transactions.amount"),
+        cell: ({ row, getValue }) => <Money cents={getValue()} format={formatCents} signed={row.original.signed} />,
+      }),
+    ],
+    [t],
   );
 
   return (
-    <DataTable
+    <RecordTable
       label={t("expenses.byCategory")}
-      columns={
-        <>
-          <Table.Column isRowHeader>{t("expenses.category")}</Table.Column>
-          <Table.Column>{t("transactions.amount")}</Table.Column>
-        </>
-      }
-    >
-      {[
-        total("income", t("expenses.income"), summary.income),
-        ...rows("income"),
-        total("expense", t("expenses.expenses"), summary.expenses),
-        ...rows("expense"),
-        total("net", t("expenses.net"), summary.net, true),
-      ]}
-    </DataTable>
+      data={rows}
+      columns={columns}
+      getRowId={row => row.id}
+      rowClassName={row => (row.isTotal ? "[&>td]:font-semibold" : undefined)}
+      paged={false}
+    />
   );
 }

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Table } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
-import { DataTable, Money } from "@client/components/ui";
+import { Money } from "@client/components/ui";
+import { moneyColumn, RecordTable, recordColumns } from "@client/components/RecordTable";
 import { formatCents, nameOf } from "@client/utils/format";
 import type { Group, InterestSummary } from "@arthurzakharov/family-budget-be-client";
 
@@ -9,47 +11,56 @@ type Props = {
   groups: Group[];
 };
 
-// Monthly interest payouts, with a column per group when there is more than one.
+type Payout = InterestSummary["payouts"][number];
+
+const column = recordColumns<Payout>();
+
+// Monthly interest payouts, with a column per group when there is more than one. One row a
+// month, so the list grows and is split into pages.
 export function PayoutTable({ interest, groups }: Props) {
   const { t } = useI18n();
   // Groups in the order they were created, plus any only known from transactions.
   const groupIds = Object.keys(interest.byGroup);
   const groupColumns = groupIds.length > 1 ? groupIds : [];
+  const groupKey = groupColumns.join(",");
+
+  const columns = useMemo(
+    () => [
+      column.accessor("date", {
+        header: t("common.date"),
+        enableSorting: true,
+        sortFn: "basic",
+        meta: { isRowHeader: true, className: "whitespace-nowrap" },
+      }),
+      column.accessor("gross", moneyColumn(t("payouts.beforeTax"), formatCents)),
+      column.accessor("tax", moneyColumn(t("common.tax"), formatCents)),
+      column.accessor("net", moneyColumn(t("payouts.afterTax"), formatCents)),
+      ...groupColumns.map(id =>
+        column.accessor(p => p.netByGroup[id] ?? 0, {
+          id: `group-${id}`,
+          header: t("payouts.groupAfterTax", { group: nameOf(groups, id) }),
+          enableSorting: true,
+          sortFn: "basic",
+          cell: ({ getValue }) => <Money cents={getValue()} format={formatCents} />,
+        }),
+      ),
+      column.accessor("balance", moneyColumn(t("common.balance"), formatCents)),
+    ],
+    // groupKey stands in for groupColumns, which is a new array on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, groups, groupKey],
+  );
+
   const money = (cents: number) => <Money cents={cents} format={formatCents} />;
 
   return (
-    <DataTable
+    <RecordTable
       label={t("payouts.title")}
       emptyText={t("payouts.empty")}
-      columns={
-        <>
-          <Table.Column isRowHeader>{t("common.date")}</Table.Column>
-          <Table.Column>{t("payouts.beforeTax")}</Table.Column>
-          <Table.Column>{t("common.tax")}</Table.Column>
-          <Table.Column>{t("payouts.afterTax")}</Table.Column>
-          {groupColumns.map(id => (
-            <Table.Column key={id} id={`group-${id}`}>
-              {t("payouts.groupAfterTax", { group: nameOf(groups, id) })}
-            </Table.Column>
-          ))}
-          <Table.Column>{t("common.balance")}</Table.Column>
-        </>
-      }
-    >
-      {interest.payouts.map(p => (
-        <Table.Row key={p.date} id={p.date}>
-          <Table.Cell className="whitespace-nowrap">{p.date}</Table.Cell>
-          <Table.Cell>{money(p.gross)}</Table.Cell>
-          <Table.Cell>{money(p.tax)}</Table.Cell>
-          <Table.Cell>{money(p.net)}</Table.Cell>
-          {groupColumns.map(id => (
-            <Table.Cell key={id}>{money(p.netByGroup[id] ?? 0)}</Table.Cell>
-          ))}
-          <Table.Cell>{money(p.balance)}</Table.Cell>
-        </Table.Row>
-      ))}
-      {/* The total row only makes sense under actual payouts; without any the empty text shows instead. */}
-      {interest.payouts.length > 0 && (
+      data={interest.payouts}
+      columns={columns}
+      getRowId={p => p.date}
+      footer={
         <Table.Row key="total" id="total" className="[&>td]:font-semibold">
           <Table.Cell>{t("common.total")}</Table.Cell>
           <Table.Cell>{money(interest.gross)}</Table.Cell>
@@ -60,7 +71,7 @@ export function PayoutTable({ interest, groups }: Props) {
           ))}
           <Table.Cell> </Table.Cell>
         </Table.Row>
-      )}
-    </DataTable>
+      }
+    />
   );
 }

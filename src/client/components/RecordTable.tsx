@@ -5,7 +5,6 @@ import {
   createColumnHelper,
   createPaginatedRowModel,
   createSortedRowModel,
-  FlexRender,
   metaHelper,
   rowPaginationFeature,
   rowSortingFeature,
@@ -20,7 +19,7 @@ import {
 } from "@tanstack/react-table";
 import { Pagination, Table, type SortDescriptor } from "@heroui/react";
 import { useI18n } from "@client/context/i18n";
-import { DataTable } from "@client/components/ui";
+import { DataTable, Money } from "@client/components/ui";
 
 // Extra settings a column can have, read when drawing it.
 type RecordColumnMeta = {
@@ -28,6 +27,8 @@ type RecordColumnMeta = {
   isRowHeader?: boolean;
   // Classes for the column's cells
   className?: string;
+  // Classes for the column's header, e.g. a fixed width
+  headerClassName?: string;
   // For columns without a visible header, e.g. the Edit/Delete buttons
   ariaLabel?: string;
 };
@@ -46,11 +47,29 @@ const features = tableFeatures({
 // Builds typed columns for records of type T.
 export const recordColumns = <T extends RowData>() => createColumnHelper<typeof features, T>();
 
+// Settings for a sortable column of money, e.g. `column.accessor("added", moneyColumn(t("crypto.added"), formatMoney))`.
+// Signed amounts are coloured by sign.
+export const moneyColumn = (header: string, format: (cents: number) => string, signed = false) => ({
+  header,
+  enableSorting: true,
+  sortFn: "basic" as const,
+  cell: ({ getValue }: { getValue: () => number }) => <Money cents={getValue()} format={format} signed={signed} />,
+});
+
 const PAGE_SIZE = 20;
+
+// A column's header or cell template, filled in. Unlike TanStack's FlexRender, a function is
+// called rather than mounted as a component: columns are rebuilt whenever their callbacks
+// change, and a new component type on every render would remount every cell (losing focus and
+// anything typed into a form inside a row). So cell and header functions must not use hooks.
+function render<TContext>(template: unknown, context: TContext): ReactNode {
+  return typeof template === "function" ? (template as (context: TContext) => ReactNode)(context) : (template as ReactNode);
+}
 
 type Props<T extends RowData> = {
   label: string;
-  emptyText: string;
+  // Shown when there are no records; "—" when not given
+  emptyText?: string;
   data: T[];
   // Columns sort only when they say `enableSorting: true`. Keep the array stable (useMemo).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- columns hold values of different types
@@ -59,12 +78,28 @@ type Props<T extends RowData> = {
   rowClassName?: (record: T) => string | undefined;
   // Rows under the records, e.g. totals. Shown on every page, and only when there are records.
   footer?: ReactNode;
+  // The order before any header is clicked; by default the order of `data`.
+  initialSorting?: SortingState;
+  // Short summaries show every row; lists that grow are split into pages.
+  paged?: boolean;
 };
 
-export function RecordTable<T extends RowData>({ label, emptyText, data, columns, getRowId, rowClassName, footer }: Props<T>) {
-  // Records stay in the order the server sent them until a header is clicked.
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: PAGE_SIZE });
+export function RecordTable<T extends RowData>({
+  label,
+  emptyText,
+  data,
+  columns,
+  getRowId,
+  rowClassName,
+  footer,
+  initialSorting = [],
+  paged = true,
+}: Props<T>) {
+  const [sorting, setSorting] = useState<SortingState>(initialSorting);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: paged ? PAGE_SIZE : Number.MAX_SAFE_INTEGER,
+  });
 
   const table = useTable({
     features,
@@ -108,15 +143,27 @@ export function RecordTable<T extends RowData>({ label, emptyText, data, columns
         onSortChange={onSortChange}
         columns={headers.map(header => {
           const { meta } = header.column.columnDef;
-          const title = <FlexRender header={header} />;
+          const title = render(header.column.columnDef.header, header.getContext());
           return header.column.getCanSort() ? (
-            <Table.Column key={header.id} id={header.id} allowsSorting isRowHeader={meta?.isRowHeader}>
+            <Table.Column
+              key={header.id}
+              id={header.id}
+              allowsSorting
+              isRowHeader={meta?.isRowHeader}
+              className={meta?.headerClassName}
+            >
               {({ sortDirection }) => (
                 <Table.SortableColumnHeader sortDirection={sortDirection}>{title}</Table.SortableColumnHeader>
               )}
             </Table.Column>
           ) : (
-            <Table.Column key={header.id} id={header.id} isRowHeader={meta?.isRowHeader} aria-label={meta?.ariaLabel}>
+            <Table.Column
+              key={header.id}
+              id={header.id}
+              isRowHeader={meta?.isRowHeader}
+              aria-label={meta?.ariaLabel}
+              className={meta?.headerClassName}
+            >
               {title}
             </Table.Column>
           );
@@ -126,7 +173,7 @@ export function RecordTable<T extends RowData>({ label, emptyText, data, columns
           <Table.Row key={row.id} id={row.id} className={rowClassName?.(row.original)}>
             {row.getAllCells().map(cell => (
               <Table.Cell key={cell.id} className={cell.column.columnDef.meta?.className}>
-                <FlexRender cell={cell} />
+                {render(cell.column.columnDef.cell, cell.getContext())}
               </Table.Cell>
             ))}
           </Table.Row>
