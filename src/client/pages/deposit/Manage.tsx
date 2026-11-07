@@ -14,6 +14,7 @@ import { RateTable } from "@client/components/deposit/RateTable";
 import { TransactionForm } from "@client/components/deposit/TransactionForm";
 import { TransactionTable } from "@client/components/deposit/TransactionTable";
 import { Message, Section } from "@client/components/ui";
+import { useConfirmDelete } from "@client/components/ConfirmDelete";
 import type { DepositRate, DepositTransaction } from "@arthurzakharov/family-budget-be-client";
 
 // Adding, editing and deleting rates and transactions. Only for admins and contributors.
@@ -31,6 +32,7 @@ export function Manage() {
   );
   // Rows whose delete request is running; their buttons show a spinner meanwhile.
   const deleting = usePendingIds();
+  const { confirmDelete, dialog: confirmDialog } = useConfirmDelete();
 
   const openRate = (record: DepositRate | null) => setRateDialog({ open: true, record });
   const openTransaction = (record: DepositTransaction | null) => setTransactionDialog({ open: true, record });
@@ -52,7 +54,7 @@ export function Manage() {
 
   const onDelete = async (tx: DepositTransaction) => {
     const message = tx.type === "withdrawal" ? "transactions.confirmDeleteWithdrawal" : "transactions.confirmDeleteDeposit";
-    if (!confirm(t(message, { amount: formatCents(tx.amountCents), date: tx.date }))) return;
+    if (!(await confirmDelete(t(message, { amount: formatCents(tx.amountCents), date: tx.date })))) return;
     try {
       await deleting.track(tx.id, () => remove.mutateAsync(tx.id));
     } catch {
@@ -123,6 +125,8 @@ export function Manage() {
           onSaved={onTransactionSaved}
         />
       </FormModal>
+
+      {confirmDialog}
     </>
   );
 }

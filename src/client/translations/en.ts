@@ -149,6 +149,7 @@ export const en = {
   "common.edit": "Edit",
   "common.delete": "Delete",
   "common.cancel": "Cancel",
+  "common.cannotUndo": "This cannot be undone.",
   "common.loading": "Loading…",
   "common.saveChanges": "Save changes",
   "common.date": "Date",

@@ -12,6 +12,7 @@ import { EntryForm } from "@client/components/expenses/EntryForm";
 import { EntryTable } from "@client/components/expenses/EntryTable";
 import { formatCents } from "@client/utils/format";
 import { Message, Section } from "@client/components/ui";
+import { useConfirmDelete } from "@client/components/ConfirmDelete";
 import type { ExpenseEntry } from "@arthurzakharov/family-budget-be-client";
 
 // Adding, editing and deleting income and expenses. Only for admins and contributors, and only
@@ -26,6 +27,7 @@ export function Manage() {
   );
   // Rows whose delete request is running; their buttons show a spinner meanwhile.
   const deleting = usePendingIds();
+  const { confirmDelete, dialog: confirmDialog } = useConfirmDelete();
 
   const open = (record: ExpenseEntry | null) => setDialog({ open: true, record });
 
@@ -42,7 +44,7 @@ export function Manage() {
 
   const onDelete = async (entry: ExpenseEntry) => {
     const params = { category: categoryName(t, entry.categoryId), amount: formatCents(entry.amountCents), date: entry.date };
-    if (!confirm(t("expenses.confirmDelete", params))) return;
+    if (!(await confirmDelete(t("expenses.confirmDelete", params)))) return;
     try {
       await deleting.track(entry.id, () => remove.mutateAsync(entry.id));
     } catch {
@@ -80,6 +82,8 @@ export function Manage() {
       >
         <EntryForm editing={dialog.record} onSaved={onSaved} />
       </FormModal>
+
+      {confirmDialog}
     </>
   );
 }

@@ -152,6 +152,7 @@ export const ru: Record<TranslationKey, string> = {
   "common.edit": "Изменить",
   "common.delete": "Удалить",
   "common.cancel": "Отмена",
+  "common.cannotUndo": "Это действие нельзя отменить.",
   "common.loading": "Загрузка…",
   "common.saveChanges": "Сохранить изменения",
   "common.date": "Дата",

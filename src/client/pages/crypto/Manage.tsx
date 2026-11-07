@@ -11,6 +11,7 @@ import { closedDialog, FormModal, type RecordDialog } from "@client/components/f
 import { CryptoTransactionForm } from "@client/components/crypto/CryptoTransactionForm";
 import { CryptoTransactionTable } from "@client/components/crypto/CryptoTransactionTable";
 import { Message, Section } from "@client/components/ui";
+import { useConfirmDelete } from "@client/components/ConfirmDelete";
 import type { CryptoTransaction } from "@arthurzakharov/family-budget-be-client";
 
 // Adding, editing and deleting buys and sells. Only for admins and contributors, and only
@@ -24,6 +25,7 @@ export function Manage() {
   );
   // Rows whose delete request is running; their buttons show a spinner meanwhile.
   const deleting = usePendingIds();
+  const { confirmDelete, dialog: confirmDialog } = useConfirmDelete();
 
   const open = (record: CryptoTransaction | null) => setDialog({ open: true, record });
 
@@ -39,7 +41,7 @@ export function Manage() {
 
   const onDelete = async (tx: CryptoTransaction) => {
     const message = tx.type === "sell" ? "crypto.confirmDeleteSell" : "crypto.confirmDeleteBuy";
-    if (!confirm(t(message, { amount: tx.amount, coin: tx.coin, date: tx.date }))) return;
+    if (!(await confirmDelete(t(message, { amount: tx.amount, coin: tx.coin, date: tx.date })))) return;
     try {
       await deleting.track(tx.id, () => remove.mutateAsync(tx.id));
     } catch {
@@ -79,6 +81,8 @@ export function Manage() {
       >
         <CryptoTransactionForm editing={dialog.record} groups={groups} members={members} coins={coins} onSaved={onSaved} />
       </FormModal>
+
+      {confirmDialog}
     </>
   );
 }
