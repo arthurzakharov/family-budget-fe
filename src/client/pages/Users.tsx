@@ -8,8 +8,8 @@ import { submitWith, useAppForm } from "@client/components/form";
 import { GroupCheckboxes, RoleSelect, type AssignableRole } from "@client/components/users/RoleAndGroupFields";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
 import { Button, Chip, Input, Modal } from "@heroui/react";
-import { PersonPlus } from "@gravity-ui/icons";
-import { editingRow, FormStack, Message, PageHeader, RowActions, Section } from "@client/components/ui";
+import { Key, PersonGear, PersonPlus, TrashBin } from "@gravity-ui/icons";
+import { editingRow, FormStack, IconAction, IconActionGap, Message, PageHeader, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
@@ -120,22 +120,30 @@ export function Users() {
             onCancel={() => setEditing(null)}
           />
         ) : (
-          <RowActions
-            // The admin's role and groups are fixed, and the admin cannot be deleted.
-            onDelete={u.role !== "admin" ? () => onDelete(u) : undefined}
-            extra={
+          // The admin's role and groups are fixed, and the admin cannot be deleted; their slots
+          // stay empty so the icons line up with the other rows.
+          <div className="flex justify-end gap-1">
+            <IconAction
+              label={t("users.changePassword")}
+              icon={<Key className="size-4" />}
+              onPress={() => setEditing({ id: u.id, field: "password" })}
+            />
+            {u.role !== "admin" ? (
               <>
-                <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "password" })}>
-                  {t("users.changePassword")}
-                </Button>
-                {u.role !== "admin" && (
-                  <Button size="sm" variant="ghost" onPress={() => setEditing({ id: u.id, field: "roleAndGroups" })}>
-                    {t("users.editRoleAndGroups")}
-                  </Button>
-                )}
+                <IconAction
+                  label={t("users.editRoleAndGroups")}
+                  icon={<PersonGear className="size-4" />}
+                  onPress={() => setEditing({ id: u.id, field: "roleAndGroups" })}
+                />
+                <IconAction label={t("common.delete")} icon={<TrashBin className="size-4" />} onPress={() => onDelete(u)} danger />
               </>
-            }
-          />
+            ) : (
+              <>
+                <IconActionGap />
+                <IconActionGap />
+              </>
+            )}
+          </div>
         ),
     }),
   ];

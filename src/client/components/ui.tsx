@@ -1,8 +1,9 @@
 // Small building blocks on top of HeroUI, so every page lays out forms, tables and
 // messages the same way.
 import { useId, type ComponentProps, type FormEvent, type ReactNode } from "react";
-import { Alert, Button, Card, Checkbox, Input, Label, ListBox, Select, Table } from "@heroui/react";
+import { Alert, Button, Card, Checkbox, Input, Label, ListBox, Select, Table, Tooltip } from "@heroui/react";
 import type { Key } from "@heroui/react";
+import { Pencil, TrashBin } from "@gravity-ui/icons";
 import { useI18n } from "@client/context/i18n";
 
 // A page's title with an optional line under it.
@@ -195,25 +196,42 @@ export function Message({ error, success }: { error?: string | null; success?: s
   );
 }
 
-// Edit and Delete buttons for a table row.
-export function RowActions({ onEdit, onDelete, extra }: { onEdit?: () => void; onDelete?: () => void; extra?: ReactNode }) {
+// Edit and Delete icon buttons for a table row, named by their tooltips.
+export function RowActions({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
   const { t } = useI18n();
   return (
     <div className="flex justify-end gap-1">
-      {extra}
-      {onEdit && (
-        <Button size="sm" variant="ghost" onPress={onEdit}>
-          {t("common.edit")}
-        </Button>
-      )}
-      {onDelete && (
-        <Button size="sm" variant="danger-soft" onPress={onDelete}>
-          {t("common.delete")}
-        </Button>
-      )}
+      {onEdit && <IconAction label={t("common.edit")} icon={<Pencil className="size-4" />} onPress={onEdit} />}
+      {onDelete && <IconAction label={t("common.delete")} icon={<TrashBin className="size-4" />} onPress={onDelete} danger />}
     </div>
   );
 }
+
+// A small icon-only button for a table row. The label names it for screen readers and shows
+// as a tooltip on hover or keyboard focus.
+export function IconAction({
+  label,
+  icon,
+  onPress,
+  danger,
+}: {
+  label: string;
+  icon: ReactNode;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <Tooltip delay={300}>
+      <Button isIconOnly size="sm" variant={danger ? "danger-soft" : "ghost"} aria-label={label} onPress={onPress}>
+        {icon}
+      </Button>
+      <Tooltip.Content>{label}</Tooltip.Content>
+    </Tooltip>
+  );
+}
+
+// Keeps a row's icon buttons lined up with the rows above and below when this row has fewer.
+export const IconActionGap = () => <span aria-hidden className="inline-block size-8 shrink-0" />;
 
 type DataTableProps = Pick<ComponentProps<typeof Table.Content>, "sortDescriptor" | "onSortChange"> & {
   label: string;

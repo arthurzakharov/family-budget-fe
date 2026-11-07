@@ -4,7 +4,7 @@
 // checks them before the form is submitted.
 import type { ComponentProps, FormEvent, ReactNode } from "react";
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
-import { Button } from "@heroui/react";
+import { Button, Tooltip } from "@heroui/react";
 import { CheckboxField as UiCheckbox, Field, SelectField as UiSelect, type Option } from "@client/components/ui";
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts();
@@ -55,18 +55,37 @@ type SubmitButtonProps = {
   requireChange?: boolean;
   // The id of the <form> it submits, when the button sits outside it (e.g. in a modal's footer)
   form?: string;
+  // Shows only this icon; `children` must then be plain text, which names the button for
+  // screen readers and shows as a tooltip.
+  icon?: ReactNode;
 };
 
 // The form's submit button; disabled while the form is being sent, so it cannot go twice.
-function SubmitButton({ children, fullWidth, size, requireChange, form: formId }: SubmitButtonProps) {
+function SubmitButton({ children, fullWidth, size, requireChange, form: formId, icon }: SubmitButtonProps) {
   const form = useFormContext();
   return (
     <form.Subscribe selector={state => state.isSubmitting || (requireChange === true && state.isDefaultValue)}>
-      {isDisabled => (
-        <Button type="submit" form={formId} fullWidth={fullWidth} size={size} isDisabled={isDisabled}>
-          {children}
-        </Button>
-      )}
+      {isDisabled =>
+        icon ? (
+          <Tooltip delay={300}>
+            <Button
+              type="submit"
+              form={formId}
+              isIconOnly
+              size={size}
+              isDisabled={isDisabled}
+              aria-label={typeof children === "string" ? children : undefined}
+            >
+              {icon}
+            </Button>
+            <Tooltip.Content>{children}</Tooltip.Content>
+          </Tooltip>
+        ) : (
+          <Button type="submit" form={formId} fullWidth={fullWidth} size={size} isDisabled={isDisabled}>
+            {children}
+          </Button>
+        )
+      }
     </form.Subscribe>
   );
 }

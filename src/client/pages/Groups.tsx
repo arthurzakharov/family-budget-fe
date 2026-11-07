@@ -4,9 +4,9 @@ import { api, errorCode, request } from "@client/api";
 import { none, queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { Button, Modal } from "@heroui/react";
-import { FolderPlus } from "@gravity-ui/icons";
+import { FolderPlus, PersonPlus, PersonXmark } from "@gravity-ui/icons";
 import { submitWith, useAppForm } from "@client/components/form";
-import { FormStack, Message, PageHeader, Section } from "@client/components/ui";
+import { FormStack, IconAction, Message, PageHeader, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
@@ -69,9 +69,12 @@ export function Groups() {
       meta: { ariaLabel: t("groups.remove") },
       cell: ({ row }) => (
         <div className="flex justify-end">
-          <Button size="sm" variant="danger-soft" onPress={() => setMember(group, row.original.id, false)}>
-            {t("groups.remove")}
-          </Button>
+          <IconAction
+            label={t("groups.remove")}
+            icon={<PersonXmark className="size-4" />}
+            onPress={() => setMember(group, row.original.id, false)}
+            danger
+          />
         </div>
       ),
     }),
@@ -151,7 +154,7 @@ function AddMemberForm({ users, onAdd }: { users: PublicUser[]; onAdd: (userId: 
             />
           )}
         </form.AppField>
-        <form.SubmitButton>{t("groups.add")}</form.SubmitButton>
+        <form.SubmitButton icon={<PersonPlus className="size-4" />}>{t("groups.add")}</form.SubmitButton>
       </form>
     </form.AppForm>
   );
