@@ -4,13 +4,19 @@ import { none, queries } from "@client/queries";
 // The expenses page's data, shared by all of its tabs. Each list comes from the query cache, so
 // switching tabs (or coming back to the page) needs no new requests.
 export function useExpenses() {
+  const groups = useQuery(queries.groups);
+  const members = useQuery(queries.members);
+  const expenseCategories = useQuery(queries.expenseCategories);
+  const expenseEntries = useQuery(queries.expenseEntries);
   return {
-    groups: useQuery(queries.groups).data ?? none,
-    members: useQuery(queries.members).data ?? none,
+    // Some of the data has not arrived yet (e.g. while the backend wakes up)
+    isLoading: groups.isPending || members.isPending || expenseCategories.isPending || expenseEntries.isPending,
+    groups: groups.data ?? none,
+    members: members.data ?? none,
     // All categories, hidden ones too, so old records still show their category's name
-    categories: useQuery(queries.expenseCategories).data ?? none,
+    categories: expenseCategories.data ?? none,
     // Only the records of groups this user may see; the server leaves out the rest.
-    entries: useQuery(queries.expenseEntries).data ?? none,
+    entries: expenseEntries.data ?? none,
   };
 }
 

@@ -17,12 +17,14 @@ type Props = {
   onEdit?: (transaction: CryptoTransaction) => void;
   onDelete?: (transaction: CryptoTransaction) => void;
   editingId?: string | null;
+  // Whether a record's delete request is running
+  isDeleting?: (id: string) => boolean;
 };
 
 const column = recordColumns<CryptoTransaction>();
 
 // Sortable, paged list of buys and sells.
-export function CryptoTransactionTable({ transactions, groups, members, onEdit, onDelete, editingId }: Props) {
+export function CryptoTransactionTable({ transactions, groups, members, onEdit, onDelete, editingId, isDeleting }: Props) {
   const { t } = useI18n();
   // A user in one group always sees that group, so the column would say nothing.
   const showGroup = hasSeveralGroups(useCurrentUser());
@@ -76,12 +78,18 @@ export function CryptoTransactionTable({ transactions, groups, members, onEdit, 
               id: "actions",
               header: " ",
               meta: { ariaLabel: t("common.edit") },
-              cell: ({ row }) => <RowActions onEdit={() => onEdit(row.original)} onDelete={() => onDelete(row.original)} />,
+              cell: ({ row }) => (
+                <RowActions
+                  onEdit={() => onEdit(row.original)}
+                  onDelete={() => onDelete(row.original)}
+                  isDeleting={isDeleting?.(row.original.id)}
+                />
+              ),
             }),
           ]
         : []),
     ],
-    [t, groups, members, showGroup, editable, onEdit, onDelete],
+    [t, groups, members, showGroup, editable, onEdit, onDelete, isDeleting],
   );
 
   return (

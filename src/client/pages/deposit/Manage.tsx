@@ -5,6 +5,8 @@ import { formatCents } from "@client/utils/format";
 import { api, errorCode, request } from "@client/api";
 import { queries, useDeleteMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
+import { usePendingIds } from "@client/utils/pending";
+import { notify } from "@client/utils/notify";
 import { useDeposit } from "@client/context/deposit";
 import { closedDialog, FormModal, type RecordDialog } from "@client/components/form";
 import { RateForm } from "@client/components/deposit/RateForm";
@@ -21,40 +23,42 @@ export function Manage() {
   const { groups, members, transactions, rates } = useDeposit();
   const [rateDialog, setRateDialog] = useState<RecordDialog<DepositRate>>(closedDialog);
   const [transactionDialog, setTransactionDialog] = useState<RecordDialog<DepositTransaction>>(closedDialog);
-  // Success messages, shown above the list that changed
-  const [rateNotice, setRateNotice] = useState<string | null>(null);
-  const [transactionNotice, setTransactionNotice] = useState<string | null>(null);
   // Deleting a transaction changes the interest, which the server works out.
   const remove = useDeleteMutation(
     queries.depositTransactions,
     id => request(api.deposit.transactions[":id"].$delete({ param: { id } })),
     { invalidates: [queries.depositInterest.queryKey] },
   );
+  // Rows whose delete request is running; their buttons show a spinner meanwhile.
+  const deleting = usePendingIds();
 
-  const openRate = (record: DepositRate | null) => {
-    setRateNotice(null);
-    setRateDialog({ open: true, record });
-  };
-  const openTransaction = (record: DepositTransaction | null) => {
-    setTransactionNotice(null);
-    setTransactionDialog({ open: true, record });
-  };
+  const openRate = (record: DepositRate | null) => setRateDialog({ open: true, record });
+  const openTransaction = (record: DepositTransaction | null) => setTransactionDialog({ open: true, record });
+
+  // A transaction's amount and date, naming it in toasts
+  const describe = (tx: DepositTransaction) => `${formatCents(tx.amountCents)} · ${tx.date}`;
 
   // The forms have already put the saved record in the lists.
-  const onRateSaved = () => {
-    setRateNotice(rateDialog.record ? "common.saved" : "rates.added");
+  const onRateSaved = (rate: DepositRate) => {
+    if (rateDialog.record) notify.updated(t("rates.updated"), `${rate.ratePercent}%`);
+    else notify.created(t("rates.added"), `${rate.ratePercent}%`);
     setRateDialog(d => ({ ...d, open: false }));
   };
-  const onTransactionSaved = () => {
-    setTransactionNotice(transactionDialog.record ? "common.saved" : "transactions.added");
+  const onTransactionSaved = (tx: DepositTransaction) => {
+    if (transactionDialog.record) notify.updated(t("transactions.updated"), describe(tx));
+    else notify.created(t("transactions.added"), describe(tx));
     setTransactionDialog(d => ({ ...d, open: false }));
   };
 
   const onDelete = async (tx: DepositTransaction) => {
     const message = tx.type === "withdrawal" ? "transactions.confirmDeleteWithdrawal" : "transactions.confirmDeleteDeposit";
     if (!confirm(t(message, { amount: formatCents(tx.amountCents), date: tx.date }))) return;
-    setTransactionNotice(null);
-    await remove.mutateAsync(tx.id).catch(() => {}); // a failure is shown from remove.error
+    try {
+      await deleting.track(tx.id, () => remove.mutateAsync(tx.id));
+    } catch {
+      return; // shown from remove.error
+    }
+    notify.deleted(t("transactions.deleted"), describe(tx));
   };
 
   return (
@@ -68,7 +72,6 @@ export function Manage() {
           </Button>
         }
       >
-        <Message success={rateNotice} />
         <RateTable
           rates={rates}
           members={members}
@@ -86,13 +89,14 @@ export function Manage() {
           </Button>
         }
       >
-        <Message error={errorCode(remove.error)} success={transactionNotice} />
+        <Message error={errorCode(remove.error)} />
         <TransactionTable
           transactions={transactions}
           groups={groups}
           members={members}
           onEdit={openTransaction}
           onDelete={onDelete}
+          isDeleting={deleting.isPending}
           editingId={transactionDialog.open ? transactionDialog.record?.id : undefined}
         />
       </Section>

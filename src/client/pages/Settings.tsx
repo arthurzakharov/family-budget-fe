@@ -2,6 +2,7 @@ import { languages, useI18n, type Language } from "@client/context/i18n";
 import { themes, useTheme, type Theme } from "@client/context/theme";
 import { useAuthMutation, useCurrentUser } from "@client/context/auth";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
+import { notify } from "@client/utils/notify";
 import { api, errorCode, request } from "@client/api";
 import { useMutation } from "@tanstack/react-query";
 import { Avatar, Button, ToggleButton, ToggleButtonGroup, type Key } from "@heroui/react";
@@ -38,6 +39,7 @@ export function Settings() {
         return; // shown from changePassword.error
       }
       formApi.reset();
+      notify.updated(t("users.passwordChanged"));
     },
   });
 
@@ -64,10 +66,7 @@ export function Settings() {
         </Section>
 
         <Section title={t("settings.changePassword")} className="mb-0">
-          <Message
-            error={errorCode(changePassword.error)}
-            success={changePassword.isSuccess ? "users.passwordChanged" : null}
-          />
+          <Message error={errorCode(changePassword.error)} />
           <passwordForm.AppForm>
             <FormStack onSubmit={submitWith(passwordForm)}>
               <passwordForm.AppField name="current">

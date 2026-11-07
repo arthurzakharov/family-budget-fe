@@ -1,6 +1,6 @@
 // A list of records (transactions, expense entries...) driven by TanStack Table and drawn with
 // HeroUI's Table: click a column header to sort, and long lists are split into pages.
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import {
   createColumnHelper,
   createPaginatedRowModel,
@@ -57,6 +57,16 @@ export const moneyColumn = (header: string, format: (cents: number) => string, s
 });
 
 const PAGE_SIZE = 20;
+
+// Whether the data of the tables inside has not arrived yet. Pages set it once around their
+// content (see TablesLoading) instead of passing it to every table.
+const TablesLoadingContext = createContext(false);
+
+// Every RecordTable inside shows a spinner instead of its rows (or "nothing yet") while
+// `isLoading`, e.g. while the backend is waking up.
+export function TablesLoading({ isLoading, children }: { isLoading: boolean; children: ReactNode }) {
+  return <TablesLoadingContext value={isLoading}>{children}</TablesLoadingContext>;
+}
 
 // A column's header or cell template, filled in. Unlike TanStack's FlexRender, a function is
 // called rather than mounted as a component: columns are rebuilt whenever their callbacks
@@ -132,13 +142,16 @@ export function RecordTable<T extends RowData>({
   };
 
   const headers = table.getHeaderGroups()[0]?.headers ?? [];
-  const rows = table.getRowModel().rows;
+  // Until the data has arrived, no rows (and no totals): the table shows a spinner instead.
+  const isLoading = useContext(TablesLoadingContext);
+  const rows = isLoading ? [] : table.getRowModel().rows;
 
   return (
     <>
       <DataTable
         label={label}
         emptyText={emptyText}
+        isLoading={isLoading}
         sortDescriptor={sortDescriptor}
         onSortChange={onSortChange}
         columns={headers.map(header => {
@@ -178,9 +191,9 @@ export function RecordTable<T extends RowData>({
             ))}
           </Table.Row>
         ))}
-        {data.length > 0 && footer}
+        {!isLoading && data.length > 0 && footer}
       </DataTable>
-      {pageCount > 1 && (
+      {!isLoading && pageCount > 1 && (
         <Pages
           page={pagination.pageIndex + 1}
           pageCount={pageCount}

@@ -1,7 +1,7 @@
 // Small building blocks on top of HeroUI, so every page lays out forms, tables and
 // messages the same way.
 import { useId, type ComponentProps, type FormEvent, type ReactNode } from "react";
-import { Alert, Button, Card, Checkbox, Input, Label, ListBox, Select, Table, Tooltip } from "@heroui/react";
+import { Alert, Button, Card, Checkbox, Input, Label, ListBox, Select, Spinner, Table, Tooltip } from "@heroui/react";
 import type { Key } from "@heroui/react";
 import { Pencil, TrashBin } from "@gravity-ui/icons";
 import { useI18n } from "@client/context/i18n";
@@ -181,6 +181,23 @@ export function CheckboxField({
   );
 }
 
+// A spinner over a card or dialog while it is sending something. Put it last inside a
+// `relative` container; it takes the container's rounded corners. Make the container's
+// contents `inert` at the same time, so nothing can be clicked or typed meanwhile.
+// `size` "sm" suits small areas such as a form inside a table row.
+export function LoadingOverlay({ size = "lg" }: { size?: "sm" | "lg" }) {
+  const { t } = useI18n();
+  return (
+    <div
+      role="status"
+      className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-surface/60 backdrop-blur-[2px]"
+    >
+      <Spinner size={size} />
+      <span className="sr-only">{t("common.loading")}</span>
+    </div>
+  );
+}
+
 // An error or success message. Takes a translation key, like the rest of the app's messages.
 export function Message({ error, success }: { error?: string | null; success?: string | null }) {
   const { t } = useI18n();
@@ -197,33 +214,66 @@ export function Message({ error, success }: { error?: string | null; success?: s
 }
 
 // Edit and Delete icon buttons for a table row, named by their tooltips.
-export function RowActions({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
+// While `isDeleting`, the delete button shows a spinner and both are locked.
+export function RowActions({
+  onEdit,
+  onDelete,
+  isDeleting = false,
+}: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isDeleting?: boolean;
+}) {
   const { t } = useI18n();
   return (
     <div className="flex justify-end gap-1">
-      {onEdit && <IconAction label={t("common.edit")} icon={<Pencil className="size-4" />} onPress={onEdit} />}
-      {onDelete && <IconAction label={t("common.delete")} icon={<TrashBin className="size-4" />} onPress={onDelete} danger />}
+      {onEdit && (
+        <IconAction label={t("common.edit")} icon={<Pencil className="size-4" />} onPress={onEdit} isDisabled={isDeleting} />
+      )}
+      {onDelete && (
+        <IconAction
+          label={t("common.delete")}
+          icon={<TrashBin className="size-4" />}
+          onPress={onDelete}
+          isPending={isDeleting}
+          danger
+        />
+      )}
     </div>
   );
 }
 
 // A small icon-only button for a table row. The label names it for screen readers and shows
 // as a tooltip on hover or keyboard focus.
+// While `isPending` (its request is running) it shows a spinner instead of the icon and
+// cannot be pressed again.
 export function IconAction({
   label,
   icon,
   onPress,
   danger,
+  isPending = false,
+  isDisabled = false,
 }: {
   label: string;
   icon: ReactNode;
   onPress: () => void;
   danger?: boolean;
+  isPending?: boolean;
+  isDisabled?: boolean;
 }) {
   return (
     <Tooltip delay={300}>
-      <Button isIconOnly size="sm" variant={danger ? "danger-soft" : "ghost"} aria-label={label} onPress={onPress}>
-        {icon}
+      <Button
+        isIconOnly
+        size="sm"
+        variant={danger ? "danger-soft" : "ghost"}
+        aria-label={label}
+        onPress={onPress}
+        isPending={isPending}
+        isDisabled={isDisabled}
+      >
+        {isPending ? <Spinner color="current" size="sm" /> : icon}
       </Button>
       <Tooltip.Content>{label}</Tooltip.Content>
     </Tooltip>
@@ -240,16 +290,37 @@ type DataTableProps = Pick<ComponentProps<typeof Table.Content>, "sortDescriptor
   // <Table.Row> elements
   children: ReactNode;
   emptyText?: string;
+  // The data has not arrived yet
+  isLoading?: boolean;
 };
 
 // A HeroUI table with horizontal scrolling on small screens and an empty-state message.
-export function DataTable({ label, columns, children, emptyText, sortDescriptor, onSortChange }: DataTableProps) {
+// While `isLoading`, pass no rows: the body then shows a spinner instead of the empty text.
+export function DataTable({ label, columns, children, emptyText, isLoading = false, sortDescriptor, onSortChange }: DataTableProps) {
+  const { t } = useI18n();
   return (
     <Table>
       <Table.ScrollContainer>
-        <Table.Content aria-label={label} className="min-w-full" sortDescriptor={sortDescriptor} onSortChange={onSortChange}>
+        <Table.Content
+          aria-label={label}
+          aria-busy={isLoading}
+          className="min-w-full"
+          sortDescriptor={sortDescriptor}
+          onSortChange={onSortChange}
+        >
           <Table.Header>{columns}</Table.Header>
-          <Table.Body renderEmptyState={() => <p className="py-6 text-center text-sm text-muted">{emptyText ?? "—"}</p>}>
+          <Table.Body
+            renderEmptyState={() =>
+              isLoading ? (
+                <div role="status" className="flex items-center justify-center gap-2 py-6 text-sm text-muted">
+                  <Spinner size="sm" />
+                  {t("common.loading")}
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-muted">{emptyText ?? "—"}</p>
+              )
+            }
+          >
             {children}
           </Table.Body>
         </Table.Content>

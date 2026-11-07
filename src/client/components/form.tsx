@@ -2,14 +2,27 @@
 // inside <form.AppField name="..."> the field components below read and write that field.
 // Inputs keep their `name` and native attributes (required, min...), so the browser still
 // checks them before the form is submitted.
-import { useId, type ComponentProps, type FormEvent, type ReactNode } from "react";
-import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
-import { Button, Modal, Tooltip } from "@heroui/react";
+import { createContext, useContext, useEffect, useId, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import { createFormHook, createFormHookContexts, useStore } from "@tanstack/react-form";
+import {
+  Button,
+  Calendar,
+  DateField,
+  DatePicker,
+  Label,
+  Modal,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+} from "@heroui/react";
+import { parseDate, type DateValue } from "@internationalized/date";
+import { I18nProvider } from "react-aria-components";
 import { useI18n } from "@client/context/i18n";
 import {
   CheckboxField as UiCheckbox,
   Field,
   FormStack,
+  LoadingOverlay,
   Message,
   SelectField as UiSelect,
   type Option,
@@ -68,6 +81,116 @@ type SubmitButtonProps = {
   icon?: ReactNode;
 };
 
+// Date formats per app language: English with the day first (dd/mm/yyyy), Russian as usual.
+const dateLocales = { en: "en-GB", ru: "ru-RU" } as const;
+
+// The field's "YYYY-MM-DD" text as a date for the picker; null while empty (or not a full date).
+function toDateValue(text: string): DateValue | null {
+  if (!text) return null;
+  try {
+    return parseDate(text);
+  } catch {
+    return null;
+  }
+}
+
+// A date typed into its parts or picked from HeroUI's calendar. The field holds "YYYY-MM-DD"
+// (what the backend expects), or "" while empty. Months and weekdays follow the app's language.
+function DatePickerField({
+  label,
+  isRequired,
+  isDisabled,
+}: {
+  label: ReactNode;
+  isRequired?: boolean;
+  isDisabled?: boolean;
+}) {
+  const field = useFieldContext<string>();
+  const { language } = useI18n();
+  return (
+    <I18nProvider locale={dateLocales[language]}>
+      <DatePicker
+        className="w-full"
+        name={field.name}
+        value={toDateValue(field.state.value)}
+        onChange={date => field.handleChange(date ? date.toString() : "")}
+        onBlur={field.handleBlur}
+        isRequired={isRequired}
+        isDisabled={isDisabled}
+      >
+        <Label>{label}</Label>
+        <DateField.Group fullWidth variant="secondary">
+          <DateField.Input>{segment => <DateField.Segment segment={segment} />}</DateField.Input>
+          <DateField.Suffix>
+            <DatePicker.Trigger>
+              <DatePicker.TriggerIndicator />
+            </DatePicker.Trigger>
+          </DateField.Suffix>
+        </DateField.Group>
+        <DatePicker.Popover>
+          <Calendar aria-label={typeof label === "string" ? label : undefined}>
+            <Calendar.Header>
+              <Calendar.YearPickerTrigger>
+                <Calendar.YearPickerTriggerHeading />
+                <Calendar.YearPickerTriggerIndicator />
+              </Calendar.YearPickerTrigger>
+              <Calendar.NavButton slot="previous" />
+              <Calendar.NavButton slot="next" />
+            </Calendar.Header>
+            <Calendar.Grid>
+              <Calendar.GridHeader>{day => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}</Calendar.GridHeader>
+              <Calendar.GridBody>{date => <Calendar.Cell date={date} />}</Calendar.GridBody>
+            </Calendar.Grid>
+            <Calendar.YearPickerGrid>
+              <Calendar.YearPickerGridBody>{({ year }) => <Calendar.YearPickerCell year={year} />}</Calendar.YearPickerGridBody>
+            </Calendar.YearPickerGrid>
+          </Calendar>
+        </DatePicker.Popover>
+      </DatePicker>
+    </I18nProvider>
+  );
+}
+
+// Colours of a ToggleField option: a light shade of its tone, the full colour once selected
+const toggleTones = {
+  success:
+    "bg-success-soft text-success-soft-foreground data-[selected=true]:bg-success data-[selected=true]:text-success-foreground",
+  danger:
+    "bg-danger-soft text-danger-soft-foreground data-[selected=true]:bg-danger data-[selected=true]:text-danger-foreground",
+};
+
+export type ToggleOption = { id: string; label: ReactNode; tone: keyof typeof toggleTones };
+
+// A choice between a few options shown as joined buttons, e.g. Income / Expense. The selected
+// one is coloured by its tone; one is always selected.
+function ToggleField({ label, options }: { label: string; options: ToggleOption[] }) {
+  const field = useFieldContext<string>();
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-1">
+      <Label id={id}>{label}</Label>
+      <ToggleButtonGroup
+        aria-labelledby={id}
+        selectionMode="single"
+        disallowEmptySelection
+        fullWidth
+        selectedKeys={[field.state.value]}
+        onSelectionChange={keys => {
+          const [key] = keys;
+          if (key !== undefined) field.handleChange(String(key));
+        }}
+      >
+        {options.map((option, i) => (
+          <ToggleButton key={option.id} id={option.id} className={toggleTones[option.tone]}>
+            {i > 0 && <ToggleButtonGroup.Separator />}
+            {option.label}
+          </ToggleButton>
+        ))}
+      </ToggleButtonGroup>
+    </div>
+  );
+}
+
 // The form's submit button; disabled while the form is being sent, so it cannot go twice.
 function SubmitButton({ children, fullWidth, size, requireChange, form: formId, icon }: SubmitButtonProps) {
   const form = useFormContext();
@@ -98,6 +221,21 @@ function SubmitButton({ children, fullWidth, size, requireChange, form: formId, 
   );
 }
 
+// Wraps a small form that is not in a dialog (e.g. inside a table row). While the form is being
+// sent, a spinner covers it and its fields and buttons are inert.
+function BusyArea({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const form = useFormContext();
+  const busy = useStore(form.store, state => state.isSubmitting);
+  return (
+    <div className={`relative rounded-lg ${className}`} aria-busy={busy}>
+      <div inert={busy} className="contents">
+        {children}
+      </div>
+      {busy && <LoadingOverlay size="sm" />}
+    </div>
+  );
+}
+
 // A form's body and footer inside a FormModal: the error (a translation key), one field per
 // line, then Cancel (closes the dialog) and the submit button.
 function ModalForm({
@@ -115,6 +253,14 @@ function ModalForm({
   const { t } = useI18n();
   const form = useFormContext();
   const id = useId();
+  // Tells the surrounding FormModal while the form is being sent, so it shows its overlay.
+  const setBusy = useContext(ModalBusyContext);
+  const isSubmitting = useStore(form.store, state => state.isSubmitting);
+  useEffect(() => {
+    setBusy(isSubmitting);
+    return () => setBusy(false);
+  }, [isSubmitting, setBusy]);
+
   return (
     <>
       <Modal.Body>
@@ -138,9 +284,12 @@ function ModalForm({
 export const { useAppForm } = createFormHook({
   fieldContext,
   formContext,
-  fieldComponents: { TextField, SelectField, CheckboxField },
-  formComponents: { SubmitButton, ModalForm },
+  fieldComponents: { TextField, SelectField, CheckboxField, ToggleField, DatePickerField },
+  formComponents: { SubmitButton, ModalForm, BusyArea },
 });
+
+// Lets a ModalForm tell its FormModal that it is being sent.
+const ModalBusyContext = createContext<(busy: boolean) => void>(() => {});
 
 // Which record dialog is open: adding (record null) or editing a record. The record is kept
 // while the dialog closes, so its title does not change during the closing animation.
@@ -172,17 +321,29 @@ export function FormModal({
   // Usually a form with <form.ModalForm> inside
   children: ReactNode;
 }) {
+  // While the form inside is being sent, a spinner covers the dialog, its contents are inert
+  // and it cannot be closed (✕, Escape or a click outside) until the answer arrives.
+  const [busy, setBusy] = useState(false);
   return (
-    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Modal.Backdrop
+      variant="blur"
+      isOpen={isOpen}
+      onOpenChange={open => (busy && !open ? undefined : onOpenChange(open))}
+      isDismissable={!busy}
+      isKeyboardDismissDisabled={busy}
+    >
       <Modal.Container placement="auto">
-        <Modal.Dialog className={modalWidths[size]}>
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">{icon}</Modal.Icon>
-            <Modal.Heading>{title}</Modal.Heading>
-            {description && <p className="text-sm text-muted">{description}</p>}
-          </Modal.Header>
-          {children}
+        <Modal.Dialog className={`relative ${modalWidths[size]}`} aria-busy={busy}>
+          <div inert={busy} className="contents">
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">{icon}</Modal.Icon>
+              <Modal.Heading>{title}</Modal.Heading>
+              {description && <p className="text-sm text-muted">{description}</p>}
+            </Modal.Header>
+            <ModalBusyContext value={setBusy}>{children}</ModalBusyContext>
+          </div>
+          {busy && <LoadingOverlay />}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

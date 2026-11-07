@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { Button, Card, Spinner } from "@heroui/react";
+import { Button, Card } from "@heroui/react";
+import { LoadingOverlay } from "@client/components/ui";
 import { useI18n } from "@client/context/i18n";
 import { useTheme } from "@client/context/theme";
 import logoLight from "@client/assets/logos/familienbudget-light.svg";
@@ -41,15 +42,7 @@ export function AuthShell({
           <Card.Content inert={isLoading}>
             <LoadingContext value={isLoading}>{children}</LoadingContext>
           </Card.Content>
-          {isLoading && (
-            <div
-              role="status"
-              className="absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-surface/60 backdrop-blur-[2px]"
-            >
-              <Spinner size="lg" />
-              <span className="sr-only">{t("common.loading")}</span>
-            </div>
-          )}
+          {isLoading && <LoadingOverlay />}
         </Card>
       </div>
     </main>

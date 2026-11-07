@@ -5,8 +5,9 @@ import { Gear } from "@gravity-ui/icons";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useReplaceMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
+import { notify } from "@client/utils/notify";
 import { FormModal, useAppForm } from "@client/components/form";
-import { CheckboxField, Message, Section } from "@client/components/ui";
+import { CheckboxField, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import { COINS } from "@shared/crypto";
 import type { CoinSymbol } from "@arthurzakharov/family-budget-be-client";
@@ -21,7 +22,6 @@ export function Coins() {
   const { t } = useI18n();
   const { data: enabled } = useQuery(queries.cryptoCoins);
   const [choosing, setChoosing] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   // In the order of the full list, like everywhere coins are offered.
   const shown = useMemo(() => COINS.filter(c => enabled?.includes(c.symbol)), [enabled]);
@@ -56,11 +56,10 @@ export function Coins() {
         enabled={enabled ?? none}
         onSaved={() => {
           setChoosing(false);
-          setNotice("common.saved");
+          notify.updated(t("crypto.coinsSaved"));
         }}
       />
 
-      <Message success={notice} />
 
       <Section title={t("crypto.coins")}>
         <RecordTable

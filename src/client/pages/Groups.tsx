@@ -3,11 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
-import { Button } from "@heroui/react";
+import { usePendingIds } from "@client/utils/pending";
+import { notify } from "@client/utils/notify";
+import { Button, Spinner } from "@heroui/react";
 import { FolderPlus, PersonPlus, PersonXmark } from "@gravity-ui/icons";
 import { FormModal, submitWith, useAppForm } from "@client/components/form";
 import { IconAction, Message, PageHeader, Section } from "@client/components/ui";
-import { RecordTable, recordColumns } from "@client/components/RecordTable";
+import { RecordTable, recordColumns, TablesLoading } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
 const column = recordColumns<PublicUser>();
@@ -15,10 +17,11 @@ const column = recordColumns<PublicUser>();
 export function Groups() {
   const { t } = useI18n();
   const qc = useQueryClient();
-  const groups = useQuery(queries.groups).data ?? none;
-  const users = useQuery(queries.users).data ?? none;
+  const groupsQuery = useQuery(queries.groups);
+  const usersQuery = useQuery(queries.users);
+  const groups = groupsQuery.data ?? none;
+  const users = usersQuery.data ?? none;
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   // Whether the "Create group" dialog is open
   const [creating, setCreating] = useState(false);
 
@@ -49,16 +52,30 @@ export function Groups() {
       await change;
     } catch (err) {
       setError(errorCode(err));
-      setNotice(null);
       return false;
     }
     setError(null);
-    setNotice(null);
     return true;
   };
 
-  const setMember = (group: Group, userId: string, member: boolean) =>
-    run(membership.mutateAsync({ group, userId, member }));
+  // Adds or removes a member; a toast names who and which group. True when it worked.
+  const setMember = async (group: Group, userId: string, member: boolean) => {
+    // Read before the change, while the user is still in the list either way
+    const name = users.find(u => u.id === userId)?.name ?? "?";
+    const ok = await run(membership.mutateAsync({ group, userId, member }));
+    if (ok) {
+      const description = `${name} · ${group.name}`;
+      if (member) notify.created(t("groups.memberAdded"), description);
+      else notify.deleted(t("groups.memberRemoved"), description);
+    }
+    return ok;
+  };
+
+  // Members whose removal is running (keyed by group and user); their button shows a spinner.
+  const removing = usePendingIds();
+  const removeKey = (group: Group, userId: string) => `${group.id}:${userId}`;
+  const removeMember = (group: Group, userId: string) =>
+    removing.track(removeKey(group, userId), () => setMember(group, userId, false));
 
   // The members of a group, each with a button to take them out of it.
   const memberColumns = (group: Group) => [
@@ -72,7 +89,8 @@ export function Groups() {
           <IconAction
             label={t("groups.remove")}
             icon={<PersonXmark className="size-4" />}
-            onPress={() => setMember(group, row.original.id, false)}
+            onPress={() => removeMember(group, row.original.id)}
+            isPending={removing.isPending(removeKey(group, row.original.id))}
             danger
           />
         </div>
@@ -95,38 +113,48 @@ export function Groups() {
       <CreateGroupModal
         isOpen={creating}
         onOpenChange={setCreating}
-        onCreated={() => {
+        onCreated={group => {
           setCreating(false);
           setError(null);
-          setNotice("groups.created");
+          notify.created(t("groups.created"), group.name);
         }}
       />
 
-      <Message error={error} success={notice} />
-      {groups.length === 0 && <p className="text-sm text-muted">{t("groups.empty")}</p>}
+      <Message error={error} />
+      {groupsQuery.isPending ? (
+        <div role="status" className="flex items-center gap-2 text-sm text-muted">
+          <Spinner size="sm" />
+          {t("common.loading")}
+        </div>
+      ) : (
+        groups.length === 0 && <p className="text-sm text-muted">{t("groups.empty")}</p>
+      )}
 
-      <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
-        {groups.map(g => {
-          const members = users.filter(u => u.groupIds.includes(g.id));
-          // The admin stands apart and is never offered.
-          const others = users.filter(u => u.role !== "admin" && !u.groupIds.includes(g.id));
-          return (
-            <Section key={g.id} title={g.name}>
-              <RecordTable
-                label={g.name}
-                emptyText={t("groups.noMembers")}
-                data={members}
-                columns={memberColumns(g)}
-                getRowId={u => u.id}
-                paged={false}
-              />
-              {others.length > 0 && (
-                <AddMemberForm users={others} onAdd={userId => setMember(g, userId, true)} />
-              )}
-            </Section>
-          );
-        })}
-      </div>
+      {/* Each group's member list waits for the users. */}
+      <TablesLoading isLoading={usersQuery.isPending}>
+        <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
+          {groups.map(g => {
+            const members = users.filter(u => u.groupIds.includes(g.id));
+            // The admin stands apart and is never offered.
+            const others = users.filter(u => u.role !== "admin" && !u.groupIds.includes(g.id));
+            return (
+              <Section key={g.id} title={g.name}>
+                <RecordTable
+                  label={g.name}
+                  emptyText={t("groups.noMembers")}
+                  data={members}
+                  columns={memberColumns(g)}
+                  getRowId={u => u.id}
+                  paged={false}
+                />
+                {others.length > 0 && (
+                  <AddMemberForm users={others} onAdd={userId => setMember(g, userId, true)} />
+                )}
+              </Section>
+            );
+          })}
+        </div>
+      </TablesLoading>
     </>
   );
 }
@@ -143,19 +171,21 @@ function AddMemberForm({ users, onAdd }: { users: PublicUser[]; onAdd: (userId: 
 
   return (
     <form.AppForm>
-      <form onSubmit={submitWith(form)} className="mt-4 flex items-end gap-2">
-        <form.AppField name="userId">
-          {field => (
-            <field.SelectField
-              label={t("auth.selectUser")}
-              isRequired
-              placeholder={t("auth.selectUser")}
-              options={users.map(u => ({ id: u.id, label: u.name }))}
-            />
-          )}
-        </form.AppField>
-        <form.SubmitButton icon={<PersonPlus className="size-4" />}>{t("groups.add")}</form.SubmitButton>
-      </form>
+      <form.BusyArea className="mt-4">
+        <form onSubmit={submitWith(form)} className="flex items-end gap-2">
+          <form.AppField name="userId">
+            {field => (
+              <field.SelectField
+                label={t("auth.selectUser")}
+                isRequired
+                placeholder={t("auth.selectUser")}
+                options={users.map(u => ({ id: u.id, label: u.name }))}
+              />
+            )}
+          </form.AppField>
+          <form.SubmitButton icon={<PersonPlus className="size-4" />}>{t("groups.add")}</form.SubmitButton>
+        </form>
+      </form.BusyArea>
     </form.AppForm>
   );
 }
@@ -169,7 +199,7 @@ function CreateGroupModal({
 }: {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onCreated: () => void;
+  onCreated: (group: Group) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -185,18 +215,19 @@ function CreateGroupModal({
   );
 }
 
-function CreateGroupForm({ onCreated }: { onCreated: () => void }) {
+function CreateGroupForm({ onCreated }: { onCreated: (group: Group) => void }) {
   const { t } = useI18n();
   const create = useSaveMutation(queries.groups, (name: string) => request(api.groups.$post({ json: { name } })));
   const form = useAppForm({
     defaultValues: { name: "" },
     onSubmit: async ({ value }) => {
+      let group;
       try {
-        await create.mutateAsync(value.name);
+        group = await create.mutateAsync(value.name);
       } catch {
         return; // shown from create.error
       }
-      onCreated();
+      onCreated(group);
     },
   });
 

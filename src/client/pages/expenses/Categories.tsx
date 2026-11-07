@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { api, errorCode, request, type JsonRequest } from "@client/api";
+import { api, errorCode, request } from "@client/api";
 import { queries, useReplaceMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
+import { usePendingIds } from "@client/utils/pending";
+import { notify } from "@client/utils/notify";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { categoryKinds } from "@shared/expenses";
-import { Button, Chip, Switch } from "@heroui/react";
+import { Button, Chip, Spinner, Switch } from "@heroui/react";
 import { CirclePlus } from "@gravity-ui/icons";
 import { FormModal, useAppForm } from "@client/components/form";
 import { Message, Section } from "@client/components/ui";
@@ -19,22 +21,22 @@ export function Categories() {
   const { t } = useI18n();
   const { categories } = useExpenses();
   const categoryName = useCategoryName();
-  const [notice, setNotice] = useState<string | null>(null);
   // Whether the "Create category" dialog is open
   const [creating, setCreating] = useState(false);
 
-  // Both endpoints answer with the full, updated category list.
-  const save = useReplaceMutation(queries.expenseCategories, (req: () => JsonRequest<Category[]>) => request(req()));
-  const send = (req: () => JsonRequest<Category[]>) =>
-    save.mutateAsync(req).then(
-      () => true,
-      () => false, // shown from save.error
-    );
+  // Showing or hiding a category; the server answers with the full, updated category list.
+  const save = useReplaceMutation(queries.expenseCategories, ({ id, hidden }: { id: string; hidden: boolean }) =>
+    request(api.expenses.categories[":id"].$put({ param: { id }, json: { hidden } })),
+  );
+  // Switches whose request is running, with the position they are moving to. Meanwhile they
+  // show that position, are locked and have a spinner; if the server refuses, they flip back.
+  const switching = usePendingIds<boolean>();
 
-  const toggle = (c: Category, visible: boolean) => {
-    setNotice(null);
-    send(() => api.expenses.categories[":id"].$put({ param: { id: c.id }, json: { hidden: !visible } }));
-  };
+  const toggle = (c: Category, visible: boolean) =>
+    switching.track(c.id, () => save.mutateAsync({ id: c.id, hidden: !visible }), visible).then(
+      () => notify.updated(t(visible ? "expenses.categoryShown" : "expenses.categoryHidden"), categoryName(t, c.id)),
+      () => {}, // shown from save.error
+    );
 
   const columns = [
     column.accessor(c => categoryName(t, c.id), {
@@ -58,13 +60,24 @@ export function Categories() {
       id: "visible",
       header: t("expenses.visible"),
       meta: { headerClassName: "w-24" },
-      cell: ({ row: { original: c } }) => (
-        <Switch aria-label={categoryName(t, c.id)} isSelected={!c.hidden} onChange={visible => toggle(c, visible)}>
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch>
-      ),
+      cell: ({ row: { original: c } }) => {
+        const busy = switching.isPending(c.id);
+        return (
+          <div className="flex items-center gap-2">
+            <Switch
+              aria-label={categoryName(t, c.id)}
+              isSelected={busy ? switching.pendingValue(c.id) : !c.hidden}
+              isDisabled={busy}
+              onChange={visible => toggle(c, visible)}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+            {busy && <Spinner size="sm" aria-label={t("common.loading")} />}
+          </div>
+        );
+      },
     }),
   ];
 
@@ -96,14 +109,14 @@ export function Categories() {
       <CreateCategoryModal
         isOpen={creating}
         onOpenChange={setCreating}
-        onCreated={() => {
+        onCreated={name => {
           setCreating(false);
           save.reset();
-          setNotice("expenses.categoryCreated");
+          notify.created(t("expenses.categoryCreated"), name);
         }}
       />
 
-      <Message error={errorCode(save.error)} success={notice} />
+      <Message error={errorCode(save.error)} />
 
       <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
         {list("expense")}
@@ -122,7 +135,8 @@ function CreateCategoryModal({
 }: {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onCreated: () => void;
+  // Called with the new category's name
+  onCreated: (name: string) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -138,7 +152,7 @@ function CreateCategoryModal({
   );
 }
 
-function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
+function CreateCategoryForm({ onCreated }: { onCreated: (name: string) => void }) {
   const { t } = useI18n();
   // The server answers with the full, updated category list.
   const create = useReplaceMutation(queries.expenseCategories, (json: { name: string; kind: CategoryKind }) =>
@@ -152,7 +166,7 @@ function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
       } catch {
         return; // shown from create.error
       }
-      onCreated();
+      onCreated(value.name);
     },
   });
 

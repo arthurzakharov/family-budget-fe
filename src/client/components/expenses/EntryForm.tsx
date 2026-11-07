@@ -15,7 +15,7 @@ type Json = Parameters<typeof api.expenses.entries.$post>[0]["json"];
 type Props = {
   editing: ExpenseEntry | null;
   // Called after the server has saved the record
-  onSaved: () => void;
+  onSaved: (saved: ExpenseEntry) => void;
 };
 
 // Adds an income or expense record, or edits `editing` when given. Shown inside a FormModal,
@@ -38,15 +38,16 @@ export function EntryForm({ editing, onSaved }: Props) {
       userId: editing?.userId ?? "",
       groupId: defaultGroup(me, editing?.groupId),
       // Picking expense or income first narrows the category list to that list. Not sent.
-      kind: (editing ? kindOf(categories, editing.categoryId) : "expense") as CategoryKind,
+      kind: (editing ? kindOf(categories, editing.categoryId) : "income") as CategoryKind,
       categoryId: editing?.categoryId ?? "",
       date: editing?.date ?? "",
       amount: editing ? String(editing.amountCents / 100) : "",
       note: editing?.note ?? "",
     },
     onSubmit: async ({ value }) => {
+      let saved;
       try {
-        await save.mutateAsync({
+        saved = await save.mutateAsync({
           groupId: value.groupId,
           categoryId: value.categoryId,
           date: value.date,
@@ -57,7 +58,7 @@ export function EntryForm({ editing, onSaved }: Props) {
       } catch {
         return; // shown from save.error
       }
-      onSaved();
+      onSaved(saved);
     },
   });
   const kind = useStore(form.store, state => state.values.kind);
@@ -72,11 +73,11 @@ export function EntryForm({ editing, onSaved }: Props) {
         {/* The category picked from the other list no longer fits, so it is dropped. */}
         <form.AppField name="kind" listeners={{ onChange: () => form.setFieldValue("categoryId", "") }}>
           {field => (
-            <field.SelectField
+            <field.ToggleField
               label={t("transactions.type")}
               options={[
-                { id: "expense", label: t("type.expense") },
-                { id: "income", label: t("type.income") },
+                { id: "income", label: t("type.income"), tone: "success" },
+                { id: "expense", label: t("type.expense"), tone: "danger" },
               ]}
             />
           )}
@@ -92,7 +93,7 @@ export function EntryForm({ editing, onSaved }: Props) {
           )}
         </form.AppField>
         <form.AppField name="date">
-          {field => <field.TextField label={t("common.date")} type="date" required />}
+          {field => <field.DatePickerField label={t("common.date")} isRequired />}
         </form.AppField>
         <form.AppField name="amount">
           {field => <field.TextField label={t("transactions.amount")} type="number" required min="0.01" step="0.01" />}

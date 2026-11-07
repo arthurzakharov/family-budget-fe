@@ -3,6 +3,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useDeleteMutation, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
+import { usePendingIds } from "@client/utils/pending";
+import { notify } from "@client/utils/notify";
 import { useCurrentUser } from "@client/context/auth";
 import { FormModal, submitWith, useAppForm } from "@client/components/form";
 import { GroupCheckboxes, RoleSelect, type AssignableRole } from "@client/components/users/RoleAndGroupFields";
@@ -10,7 +12,7 @@ import { MIN_PASSWORD_LENGTH } from "@shared/validation";
 import { Button, Chip, Input } from "@heroui/react";
 import { Key, PersonGear, PersonPlus, TrashBin } from "@gravity-ui/icons";
 import { editingRow, IconAction, IconActionGap, Message, PageHeader, Section } from "@client/components/ui";
-import { RecordTable, recordColumns } from "@client/components/RecordTable";
+import { RecordTable, recordColumns, TablesLoading } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
 type NewUser = Parameters<typeof api.users.$post>[0]["json"];
@@ -23,14 +25,14 @@ const column = recordColumns<PublicUser>();
 export function Users() {
   const { t } = useI18n();
   const me = useCurrentUser();
-  const users = useQuery(queries.users).data ?? none;
+  const usersQuery = useQuery(queries.users);
+  const users = usersQuery.data ?? none;
   // undefined while loading, so the create form only says "make a group first" once it knows.
   const groups = useQuery(queries.groups).data;
   const [editing, setEditing] = useState<Editing | null>(null);
   // Whether the "Create user" dialog is open
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   // Users are also the members listed on the money pages, so those are fetched again after a change.
   const options = { invalidates: [queries.members.queryKey] };
@@ -49,33 +51,39 @@ export function Users() {
   const groupNames = (user: PublicUser) =>
     user.groupIds.map(id => groups?.find(g => g.id === id)?.name ?? "?").join(", ") || "–";
 
-  const report = (errorKey: string | null, messageKey: string | null = null) => {
-    setError(errorKey);
-    setMessage(messageKey);
-  };
-
-  // Runs a change and reports how it went; true when it worked.
-  const run = async (change: Promise<unknown>, messageKey: string) => {
+  // Runs a change; a failure is shown above the table, success is confirmed by `done` (a toast).
+  // True when it worked.
+  const run = async (change: Promise<unknown>, done: () => void) => {
     try {
       await change;
     } catch (err) {
-      report(errorCode(err));
+      setError(errorCode(err));
       return false;
     }
-    report(null, messageKey);
+    setError(null);
+    done();
     return true;
   };
 
   // The row forms get one of these; it resolves to true when the change worked.
   const onChangePassword = async (user: PublicUser, password: string) =>
-    (await run(changePassword.mutateAsync({ id: user.id, password }), "users.passwordChanged")) && setEditing(null);
+    (await run(changePassword.mutateAsync({ id: user.id, password }), () =>
+      notify.updated(t("users.passwordChanged"), user.name),
+    )) && setEditing(null);
 
   const onChangeRoleAndGroups = async (user: PublicUser, json: RoleAndGroups) =>
-    (await run(update.mutateAsync({ id: user.id, json }), "users.updated")) && setEditing(null);
+    (await run(update.mutateAsync({ id: user.id, json }), () => notify.updated(t("users.updated"), user.name))) &&
+    setEditing(null);
+
+  // Users whose delete request is running; their row's buttons are locked meanwhile.
+  const deleting = usePendingIds();
 
   const onDelete = async (user: PublicUser) => {
     if (!confirm(t("users.confirmDelete", { name: user.name }))) return;
-    await run(remove.mutateAsync(user.id), "users.deleted");
+    await run(
+      deleting.track(user.id, () => remove.mutateAsync(user.id)),
+      () => notify.deleted(t("users.deleted"), user.name),
+    );
   };
 
   const isEditing = (user: PublicUser, field: Editing["field"]) => editing?.id === user.id && editing.field === field;
@@ -127,6 +135,7 @@ export function Users() {
               label={t("users.changePassword")}
               icon={<Key className="size-4" />}
               onPress={() => setEditing({ id: u.id, field: "password" })}
+              isDisabled={deleting.isPending(u.id)}
             />
             {u.role !== "admin" ? (
               <>
@@ -134,8 +143,15 @@ export function Users() {
                   label={t("users.editRoleAndGroups")}
                   icon={<PersonGear className="size-4" />}
                   onPress={() => setEditing({ id: u.id, field: "roleAndGroups" })}
+                  isDisabled={deleting.isPending(u.id)}
                 />
-                <IconAction label={t("common.delete")} icon={<TrashBin className="size-4" />} onPress={() => onDelete(u)} danger />
+                <IconAction
+                  label={t("common.delete")}
+                  icon={<TrashBin className="size-4" />}
+                  onPress={() => onDelete(u)}
+                  isPending={deleting.isPending(u.id)}
+                  danger
+                />
               </>
             ) : (
               <>
@@ -166,24 +182,28 @@ export function Users() {
         isOpen={creating}
         onOpenChange={setCreating}
         groups={groups ?? []}
-        onCreated={() => {
+        onCreated={user => {
           setCreating(false);
-          report(null, "users.created");
+          setError(null);
+          notify.created(t("users.created"), user.name);
         }}
       />
 
-      <Message error={error} success={message} />
+      <Message error={error} />
 
-      <Section>
-        <RecordTable
-          label={t("nav.users")}
-          data={users}
-          columns={columns}
-          getRowId={u => u.id}
-          rowClassName={u => editingRow(editing?.id === u.id)}
-          paged={false}
-        />
-      </Section>
+      {/* The table names each user's groups, so it waits for both lists. */}
+      <TablesLoading isLoading={usersQuery.isPending || groups === undefined}>
+        <Section>
+          <RecordTable
+            label={t("nav.users")}
+            data={users}
+            columns={columns}
+            getRowId={u => u.id}
+            rowClassName={u => editingRow(editing?.id === u.id)}
+            paged={false}
+          />
+        </Section>
+      </TablesLoading>
     </>
   );
 }
@@ -199,7 +219,7 @@ function CreateUserModal({
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   groups: Group[];
-  onCreated: () => void;
+  onCreated: (user: PublicUser) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -216,7 +236,7 @@ function CreateUserModal({
 }
 
 // A new user's name, password, role and groups.
-function CreateUserForm({ groups, onCreated }: { groups: Group[]; onCreated: () => void }) {
+function CreateUserForm({ groups, onCreated }: { groups: Group[]; onCreated: (user: PublicUser) => void }) {
   const { t } = useI18n();
   // Users are also the members listed on the money pages, so those are fetched again.
   const create = useSaveMutation(queries.users, (json: NewUser) => request(api.users.$post({ json })), {
@@ -225,13 +245,14 @@ function CreateUserForm({ groups, onCreated }: { groups: Group[]; onCreated: () 
   const form = useAppForm({
     defaultValues: { name: "", password: "", role: "" as AssignableRole | "", groupIds: [] as string[] },
     onSubmit: async ({ value }) => {
+      let user;
       try {
         // The browser makes sure a role is picked.
-        await create.mutateAsync({ ...value, role: value.role as AssignableRole });
+        user = await create.mutateAsync({ ...value, role: value.role as AssignableRole });
       } catch {
         return; // shown from create.error
       }
-      onCreated();
+      onCreated(user);
     },
   });
 
@@ -269,30 +290,32 @@ function PasswordForm({ onSave, onCancel }: { onSave: (password: string) => Prom
 
   return (
     <form.AppForm>
-      <form onSubmit={submitWith(form)} className="flex items-end justify-end gap-2">
-        <form.Field name="password">
-          {field => (
-            <Input
-              variant="secondary"
-              className="h-8"
-              type="password"
-              name={field.name}
-              value={field.state.value}
-              onChange={e => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-              placeholder={t("users.newPassword")}
-              aria-label={t("users.newPassword")}
-            />
-          )}
-        </form.Field>
-        <form.SubmitButton size="sm">{t("common.saveChanges")}</form.SubmitButton>
-        <Button size="sm" variant="secondary" onPress={onCancel}>
-          {t("common.cancel")}
-        </Button>
-      </form>
+      <form.BusyArea>
+        <form onSubmit={submitWith(form)} className="flex items-end justify-end gap-2">
+          <form.Field name="password">
+            {field => (
+              <Input
+                variant="secondary"
+                className="h-8"
+                type="password"
+                name={field.name}
+                value={field.state.value}
+                onChange={e => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                required
+                minLength={MIN_PASSWORD_LENGTH}
+                autoComplete="new-password"
+                placeholder={t("users.newPassword")}
+                aria-label={t("users.newPassword")}
+              />
+            )}
+          </form.Field>
+          <form.SubmitButton size="sm">{t("common.saveChanges")}</form.SubmitButton>
+          <Button size="sm" variant="secondary" onPress={onCancel}>
+            {t("common.cancel")}
+          </Button>
+        </form>
+      </form.BusyArea>
     </form.AppForm>
   );
 }
@@ -318,18 +341,20 @@ function RoleAndGroupsForm({
 
   return (
     <form.AppForm>
-      <form onSubmit={submitWith(form)} className="flex min-w-64 flex-col gap-3">
-        <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
-        <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
-        <div className="flex gap-2">
-          <form.SubmitButton size="sm" requireChange>
-            {t("common.saveChanges")}
-          </form.SubmitButton>
-          <Button size="sm" variant="secondary" onPress={onCancel}>
-            {t("common.cancel")}
-          </Button>
-        </div>
-      </form>
+      <form.BusyArea>
+        <form onSubmit={submitWith(form)} className="flex min-w-64 flex-col gap-3">
+          <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
+          <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
+          <div className="flex gap-2">
+            <form.SubmitButton size="sm" requireChange>
+              {t("common.saveChanges")}
+            </form.SubmitButton>
+            <Button size="sm" variant="secondary" onPress={onCancel}>
+              {t("common.cancel")}
+            </Button>
+          </div>
+        </form>
+      </form.BusyArea>
     </form.AppForm>
   );
 }

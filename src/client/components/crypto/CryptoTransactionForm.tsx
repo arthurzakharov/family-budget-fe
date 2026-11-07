@@ -17,7 +17,7 @@ type Props = {
   // Coins the admin has made available
   coins: CoinSymbol[];
   // Called after the server has saved the transaction
-  onSaved: () => void;
+  onSaved: (saved: CryptoTransaction) => void;
 };
 
 // Adds a buy or sell, or edits `editing` when given. Shown inside a FormModal,
@@ -46,8 +46,9 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
       price: editing ? String(editing.price) : "",
     },
     onSubmit: async ({ value }) => {
+      let saved;
       try {
-        await save.mutateAsync({
+        saved = await save.mutateAsync({
           groupId: value.groupId,
           // The select only offers coins, and the browser makes sure one is picked.
           coin: value.coin as CoinSymbol,
@@ -60,7 +61,7 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
       } catch {
         return; // shown from save.error
       }
-      onSaved();
+      onSaved(saved);
     },
   });
 
@@ -81,18 +82,17 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
         </form.AppField>
         <form.AppField name="type">
           {field => (
-            <field.SelectField
+            <field.ToggleField
               label={t("transactions.type")}
-              isRequired
               options={[
-                { id: "buy", label: t("type.buy") },
-                { id: "sell", label: t("type.sell") },
+                { id: "buy", label: t("type.buy"), tone: "success" },
+                { id: "sell", label: t("type.sell"), tone: "danger" },
               ]}
             />
           )}
         </form.AppField>
         <form.AppField name="date">
-          {field => <field.TextField label={t("common.date")} type="date" required />}
+          {field => <field.DatePickerField label={t("common.date")} isRequired />}
         </form.AppField>
         <form.AppField name="amount">
           {field => <field.TextField label={t("crypto.amount")} type="number" required min="0" step="any" />}

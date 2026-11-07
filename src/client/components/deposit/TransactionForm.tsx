@@ -14,7 +14,7 @@ type Props = {
   groups: Group[];
   members: Member[];
   // Called after the server has saved the transaction
-  onSaved: () => void;
+  onSaved: (saved: DepositTransaction) => void;
 };
 
 // Adds a transaction, or edits `editing` when given. Shown inside a FormModal,
@@ -43,8 +43,9 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
       amount: editing ? String(editing.amountCents / 100) : "",
     },
     onSubmit: async ({ value }) => {
+      let saved;
       try {
-        await save.mutateAsync({
+        saved = await save.mutateAsync({
           groupId: value.groupId,
           type: value.type,
           date: value.date,
@@ -54,7 +55,7 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
       } catch {
         return; // shown from save.error
       }
-      onSaved();
+      onSaved(saved);
     },
   });
 
@@ -65,18 +66,17 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
         <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         <form.AppField name="type">
           {field => (
-            <field.SelectField
+            <field.ToggleField
               label={t("transactions.type")}
-              isRequired
               options={[
-                { id: "deposit", label: t("type.deposit") },
-                { id: "withdrawal", label: t("type.withdrawal") },
+                { id: "deposit", label: t("type.deposit"), tone: "success" },
+                { id: "withdrawal", label: t("type.withdrawal"), tone: "danger" },
               ]}
             />
           )}
         </form.AppField>
         <form.AppField name="date">
-          {field => <field.TextField label={t("common.date")} type="date" required />}
+          {field => <field.DatePickerField label={t("common.date")} isRequired />}
         </form.AppField>
         <form.AppField name="amount">
           {field => <field.TextField label={t("transactions.amount")} type="number" required min="0.01" step="0.01" />}

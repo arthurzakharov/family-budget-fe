@@ -13,7 +13,7 @@ type FormProps = {
   editing: DepositRate | null;
   members: Member[];
   // Called after the server has saved the rate
-  onSaved: () => void;
+  onSaved: (saved: DepositRate) => void;
 };
 
 // Adds a rate period, or edits `editing` when given. Shown inside a FormModal.
@@ -39,8 +39,9 @@ export function RateForm({ editing, members, onSaved }: FormProps) {
       current: editing ? editing.till === null : false,
     },
     onSubmit: async ({ value }) => {
+      let saved;
       try {
-        await save.mutateAsync({
+        saved = await save.mutateAsync({
           ratePercent: Number(value.ratePercent),
           from: value.fromBeginning ? null : value.from,
           till: value.current ? null : value.till,
@@ -49,7 +50,7 @@ export function RateForm({ editing, members, onSaved }: FormProps) {
       } catch {
         return; // shown from save.error
       }
-      onSaved();
+      onSaved(saved);
     },
   });
   const fromBeginning = useStore(form.store, state => state.values.fromBeginning);
@@ -64,13 +65,13 @@ export function RateForm({ editing, members, onSaved }: FormProps) {
         </form.AppField>
         <div className="flex flex-col gap-2">
           <form.AppField name="from">
-            {field => <field.TextField label={t("rates.from")} type="date" required={!fromBeginning} disabled={fromBeginning} />}
+            {field => <field.DatePickerField label={t("rates.from")} isRequired={!fromBeginning} isDisabled={fromBeginning} />}
           </form.AppField>
           <form.AppField name="fromBeginning">{field => <field.CheckboxField label={t("rates.fromBeginning")} />}</form.AppField>
         </div>
         <div className="flex flex-col gap-2">
           <form.AppField name="till">
-            {field => <field.TextField label={t("rates.till")} type="date" required={!current} disabled={current} />}
+            {field => <field.DatePickerField label={t("rates.till")} isRequired={!current} isDisabled={current} />}
           </form.AppField>
           <form.AppField name="current">{field => <field.CheckboxField label={t("rates.current")} />}</form.AppField>
         </div>

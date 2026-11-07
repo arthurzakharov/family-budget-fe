@@ -16,12 +16,14 @@ type Props = {
   onEdit?: (entry: ExpenseEntry) => void;
   onDelete?: (entry: ExpenseEntry) => void;
   editingId?: string | null;
+  // Whether a record's delete request is running
+  isDeleting?: (id: string) => boolean;
 };
 
 const column = recordColumns<ExpenseEntry>();
 
 // Sortable, paged list of income and expense records. Expenses show as negative amounts.
-export function EntryTable({ entries, onEdit, onDelete, editingId }: Props) {
+export function EntryTable({ entries, onEdit, onDelete, editingId, isDeleting }: Props) {
   const { t } = useI18n();
   // A user in one group always sees that group, so the column would say nothing.
   const showGroup = hasSeveralGroups(useCurrentUser());
@@ -69,14 +71,20 @@ export function EntryTable({ entries, onEdit, onDelete, editingId }: Props) {
               id: "actions",
               header: " ",
               meta: { ariaLabel: t("common.edit") },
-              cell: ({ row }) => <RowActions onEdit={() => onEdit(row.original)} onDelete={() => onDelete(row.original)} />,
+              cell: ({ row }) => (
+                <RowActions
+                  onEdit={() => onEdit(row.original)}
+                  onDelete={() => onDelete(row.original)}
+                  isDeleting={isDeleting?.(row.original.id)}
+                />
+              ),
             }),
           ]
         : []),
     ],
     // categoryName is rebuilt from `categories` on every render, so `categories` stands in for it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, groups, members, categories, showGroup, editable, onEdit, onDelete],
+    [t, groups, members, categories, showGroup, editable, onEdit, onDelete, isDeleting],
   );
 
   return (

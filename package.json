@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/server/index.ts",
-    "build": "bun build ./src/client/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
+    "build": "bun build.ts",
     "start": "NODE_ENV=production bun src/server/index.ts"
   },
   "dependencies": {
@@ -14,6 +14,7 @@
     "@gravity-ui/icons": "^2.23.1",
     "@heroui/react": "^3.2.7",
     "@heroui/styles": "^3.2.7",
+    "@internationalized/date": "^3.12.4",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-router": "1.170.1",
@@ -21,6 +22,7 @@
     "bun-plugin-tailwind": "^0.1.2",
     "hono": "^4.13.12",
     "react": "^19",
+    "react-aria-components": "^1.22.1",
     "react-dom": "^19",
     "tailwindcss": "^4.3.5"
   },
