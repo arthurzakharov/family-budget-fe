@@ -10,7 +10,7 @@
     "start": "NODE_ENV=production bun src/server/index.ts"
   },
   "dependencies": {
-    "@arthurzakharov/family-budget-be-client": "0.1.0",
+    "@arthurzakharov/family-budget-be-client": "0.2.0",
     "@gravity-ui/icons": "^2.23.1",
     "@heroui/react": "^3.2.7",
     "@heroui/styles": "^3.2.7",

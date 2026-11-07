@@ -1,6 +1,7 @@
 import { useI18n } from "@client/context/i18n";
 import { useCrypto } from "@client/context/crypto";
 import { HoldingsTable } from "@client/components/crypto/HoldingsTable";
+import { PricesUpdater } from "@client/components/crypto/PricesUpdater";
 import { GroupHoldingsTable } from "@client/components/crypto/GroupHoldingsTable";
 import { CryptoTransactionTable } from "@client/components/crypto/CryptoTransactionTable";
 import { Section, Stat, StatGrid } from "@client/components/ui";
@@ -29,6 +30,7 @@ export function Overview({ groupIds }: Props) {
       </StatGrid>
 
       <Section title={t("crypto.holdings")} description={t("crypto.rateHint")}>
+        <PricesUpdater />
         <HoldingsTable summary={summary} prices={prices} />
       </Section>
 

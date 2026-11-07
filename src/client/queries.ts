@@ -25,6 +25,9 @@ export const queries = {
   users: queryOptions({ queryKey: ["users"], queryFn: () => request(api.users.$get()) }),
 
   cryptoCoins: queryOptions({ queryKey: ["crypto", "coins"], queryFn: () => request(api.crypto.coins.$get()) }),
+  // The workspace's last fetched coin prices. Fetching new ones costs a call to the price API,
+  // so it only happens when someone presses "Update prices" (see useUpdatePrices).
+  cryptoPrices: queryOptions({ queryKey: ["crypto", "prices"], queryFn: () => request(api.crypto.prices.$get()) }),
   cryptoTransactions: queryOptions({
     queryKey: ["crypto", "transactions"],
     queryFn: () => request(api.crypto.transactions.$get()),

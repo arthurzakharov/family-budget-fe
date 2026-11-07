@@ -5,7 +5,7 @@
     "": {
       "name": "bun-react-template",
       "dependencies": {
-        "@arthurzakharov/family-budget-be-client": "0.1.0",
+        "@arthurzakharov/family-budget-be-client": "0.2.0",
         "@gravity-ui/icons": "^2.23.1",
         "@heroui/react": "^3.2.7",
         "@heroui/styles": "^3.2.7",
@@ -38,7 +38,7 @@
 
     "@adobe/react-spectrum-workflow": ["@adobe/react-spectrum-workflow@2.3.5", "", { "peerDependencies": { "react": "^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0", "react-dom": "^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0" } }, "sha512-b53VIPwPWKb/T5gzE3qs+QlGP5gVrw/LnWV3xMksDU+CRl3rzOKUwxIGiZO8ICyYh1WiyqY4myGlPU/nAynBUg=="],
 
-    "@arthurzakharov/family-budget-be-client": ["@arthurzakharov/family-budget-be-client@0.1.0", "https://npm.pkg.github.com/download/@arthurzakharov/family-budget-be-client/0.1.0/56d51800bc9c78d694d63acb2c064994487b3c04", { "peerDependencies": { "hono": "^4.13.12" } }, "sha512-cDfteq08bBNTyOTWkkD7ITT+L3OmDQhjgJ2s9ZFsMthbeJ7Y7/G4fXK9I7agbKUlM7vdFXAgcCgrcVBle1lvTA=="],
+    "@arthurzakharov/family-budget-be-client": ["@arthurzakharov/family-budget-be-client@0.2.0", "https://npm.pkg.github.com/download/@arthurzakharov/family-budget-be-client/0.2.0/96853b318d080e919f2f9d3ed97194f3ec69c3c3", { "peerDependencies": { "hono": "^4.13.12" } }, "sha512-LsvQLSg5FfNR8nyuSU69DIXmKsROxNOzynivI03yxOIGQT3z+CQU/li9B4FIAl4058OFoc8PrI/nYTNUNTZ8NQ=="],
 
     "@babel/runtime": ["@babel/runtime@7.29.13", "", {}, "sha512-v+oN26xP4YIlQsbQ/CbTH1WG5m/l/DjKKZNy/Kp3f/AFvbgt7Em/D0FeMM3O2hX0YzeN2M16W8lOpyhIkfCBcQ=="],
 
