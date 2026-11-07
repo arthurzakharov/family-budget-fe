@@ -4,11 +4,9 @@ import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
-import { submitWith, useAppForm } from "@client/components/form";
+import { useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
 import { defaultGroup, GroupSelect } from "@client/components/GroupSelect";
-import { Button } from "@heroui/react";
-import { FormGrid, Message } from "@client/components/ui";
 import { kindOf, MAX_NOTE_LENGTH } from "@shared/expenses";
 import type { CategoryKind, ExpenseEntry } from "@arthurzakharov/family-budget-be-client";
 
@@ -18,12 +16,11 @@ type Props = {
   editing: ExpenseEntry | null;
   // Called after the server has saved the record
   onSaved: () => void;
-  onCancel: () => void;
 };
 
-// Adds an income or expense record, or edits `editing` when given. It empties itself after adding.
-// The parent remounts it (with a key) so its starting values follow the record being edited.
-export function EntryForm({ editing, onSaved, onCancel }: Props) {
+// Adds an income or expense record, or edits `editing` when given. Shown inside a FormModal,
+// which mounts it afresh each time it opens.
+export function EntryForm({ editing, onSaved }: Props) {
   const { t } = useI18n();
   const me = useCurrentUser();
   const { groups, members, categories } = useExpenses();
@@ -47,7 +44,7 @@ export function EntryForm({ editing, onSaved, onCancel }: Props) {
       amount: editing ? String(editing.amountCents / 100) : "",
       note: editing?.note ?? "",
     },
-    onSubmit: async ({ value, formApi }) => {
+    onSubmit: async ({ value }) => {
       try {
         await save.mutateAsync({
           groupId: value.groupId,
@@ -60,7 +57,6 @@ export function EntryForm({ editing, onSaved, onCancel }: Props) {
       } catch {
         return; // shown from save.error
       }
-      if (!editing) formApi.reset();
       onSaved();
     },
   });
@@ -70,20 +66,7 @@ export function EntryForm({ editing, onSaved, onCancel }: Props) {
 
   return (
     <form.AppForm>
-      <Message error={errorCode(save.error)} />
-      <FormGrid
-        onSubmit={submitWith(form)}
-        actions={
-          <>
-            <form.SubmitButton>{editing ? t("common.saveChanges") : t("expenses.add")}</form.SubmitButton>
-            {editing && (
-              <Button variant="secondary" onPress={onCancel}>
-                {t("common.cancel")}
-              </Button>
-            )}
-          </>
-        }
-      >
+      <form.ModalForm error={errorCode(save.error)} submitLabel={editing ? t("common.saveChanges") : t("expenses.add")}>
         {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
         <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         {/* The category picked from the other list no longer fits, so it is dropped. */}
@@ -124,7 +107,7 @@ export function EntryForm({ editing, onSaved, onCancel }: Props) {
             />
           )}
         </form.AppField>
-      </FormGrid>
+      </form.ModalForm>
     </form.AppForm>
   );
 }

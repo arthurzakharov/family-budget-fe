@@ -3,10 +3,8 @@ import { api, errorCode, request } from "@client/api";
 import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
-import { submitWith, useAppForm } from "@client/components/form";
+import { useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
-import { Button } from "@heroui/react";
-import { FormGrid, Message } from "@client/components/ui";
 import type { DepositRate, Member } from "@arthurzakharov/family-budget-be-client";
 
 type Json = Parameters<typeof api.deposit.rates.$post>[0]["json"];
@@ -16,11 +14,10 @@ type FormProps = {
   members: Member[];
   // Called after the server has saved the rate
   onSaved: () => void;
-  onCancel: () => void;
 };
 
-// Adds a rate period, or edits `editing` when given. It empties itself after adding.
-export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
+// Adds a rate period, or edits `editing` when given. Shown inside a FormModal.
+export function RateForm({ editing, members, onSaved }: FormProps) {
   const { t } = useI18n();
   const me = useCurrentUser();
   // Rates change the interest, which the server works out.
@@ -41,7 +38,7 @@ export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
       fromBeginning: editing ? editing.from === null : false,
       current: editing ? editing.till === null : false,
     },
-    onSubmit: async ({ value, formApi }) => {
+    onSubmit: async ({ value }) => {
       try {
         await save.mutateAsync({
           ratePercent: Number(value.ratePercent),
@@ -52,7 +49,6 @@ export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
       } catch {
         return; // shown from save.error
       }
-      if (!editing) formApi.reset();
       onSaved();
     },
   });
@@ -61,20 +57,7 @@ export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
 
   return (
     <form.AppForm>
-      <Message error={errorCode(save.error)} />
-      <FormGrid
-        onSubmit={submitWith(form)}
-        actions={
-          <>
-            <form.SubmitButton>{editing ? t("common.saveChanges") : t("rates.add")}</form.SubmitButton>
-            {editing && (
-              <Button variant="secondary" onPress={onCancel}>
-                {t("common.cancel")}
-              </Button>
-            )}
-          </>
-        }
-      >
+      <form.ModalForm error={errorCode(save.error)} submitLabel={editing ? t("common.saveChanges") : t("rates.add")}>
         {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
         <form.AppField name="ratePercent">
           {field => <field.TextField label={t("rates.rate")} type="number" required min="0" max="100" step="0.0001" />}
@@ -91,7 +74,7 @@ export function RateForm({ editing, members, onSaved, onCancel }: FormProps) {
           </form.AppField>
           <form.AppField name="current">{field => <field.CheckboxField label={t("rates.current")} />}</form.AppField>
         </div>
-      </FormGrid>
+      </form.ModalForm>
     </form.AppForm>
   );
 }

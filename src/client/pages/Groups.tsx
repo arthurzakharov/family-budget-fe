@@ -1,12 +1,12 @@
-import { useEffect, useId, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
-import { Button, Modal } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { FolderPlus, PersonPlus, PersonXmark } from "@gravity-ui/icons";
-import { submitWith, useAppForm } from "@client/components/form";
-import { FormStack, IconAction, Message, PageHeader, Section } from "@client/components/ui";
+import { FormModal, submitWith, useAppForm } from "@client/components/form";
+import { IconAction, Message, PageHeader, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
@@ -172,7 +172,21 @@ function CreateGroupModal({
   onCreated: () => void;
 }) {
   const { t } = useI18n();
-  const formId = useId();
+  return (
+    <FormModal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      title={t("groups.create")}
+      icon={<FolderPlus className="size-5" />}
+      size="sm"
+    >
+      <CreateGroupForm onCreated={onCreated} />
+    </FormModal>
+  );
+}
+
+function CreateGroupForm({ onCreated }: { onCreated: () => void }) {
+  const { t } = useI18n();
   const create = useSaveMutation(queries.groups, (name: string) => request(api.groups.$post({ json: { name } })));
   const form = useAppForm({
     defaultValues: { name: "" },
@@ -186,43 +200,13 @@ function CreateGroupModal({
     },
   });
 
-  // Every time it opens, the dialog starts empty.
-  useEffect(() => {
-    if (!isOpen) return;
-    form.reset();
-    create.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening
-  }, [isOpen]);
-
   return (
-    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Container placement="auto">
-        <Modal.Dialog className="sm:max-w-sm">
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
-              <FolderPlus className="size-5" />
-            </Modal.Icon>
-            <Modal.Heading>{t("groups.create")}</Modal.Heading>
-          </Modal.Header>
-          <form.AppForm>
-            <Modal.Body>
-              <Message error={errorCode(create.error)} />
-              <FormStack id={formId} onSubmit={submitWith(form)}>
-                <form.AppField name="name">
-                  {field => <field.TextField label={t("groups.name")} type="text" required autoFocus />}
-                </form.AppField>
-              </FormStack>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                {t("common.cancel")}
-              </Button>
-              <form.SubmitButton form={formId}>{t("groups.create")}</form.SubmitButton>
-            </Modal.Footer>
-          </form.AppForm>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+    <form.AppForm>
+      <form.ModalForm error={errorCode(create.error)} submitLabel={t("groups.create")}>
+        <form.AppField name="name">
+          {field => <field.TextField label={t("groups.name")} type="text" required autoFocus />}
+        </form.AppField>
+      </form.ModalForm>
+    </form.AppForm>
   );
 }

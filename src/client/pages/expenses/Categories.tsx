@@ -1,13 +1,13 @@
-import { useEffect, useId, useState } from "react";
+import { useState } from "react";
 import { api, errorCode, request, type JsonRequest } from "@client/api";
 import { queries, useReplaceMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { categoryKinds } from "@shared/expenses";
-import { Button, Chip, Modal, Switch } from "@heroui/react";
+import { Button, Chip, Switch } from "@heroui/react";
 import { CirclePlus } from "@gravity-ui/icons";
-import { submitWith, useAppForm } from "@client/components/form";
-import { FormStack, Message, Section } from "@client/components/ui";
+import { FormModal, useAppForm } from "@client/components/form";
+import { Message, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Category, CategoryKind } from "@arthurzakharov/family-budget-be-client";
 
@@ -125,7 +125,21 @@ function CreateCategoryModal({
   onCreated: () => void;
 }) {
   const { t } = useI18n();
-  const formId = useId();
+  return (
+    <FormModal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      title={t("expenses.createCategory")}
+      icon={<CirclePlus className="size-5" />}
+      size="sm"
+    >
+      <CreateCategoryForm onCreated={onCreated} />
+    </FormModal>
+  );
+}
+
+function CreateCategoryForm({ onCreated }: { onCreated: () => void }) {
+  const { t } = useI18n();
   // The server answers with the full, updated category list.
   const create = useReplaceMutation(queries.expenseCategories, (json: { name: string; kind: CategoryKind }) =>
     request(api.expenses.categories.$post({ json })),
@@ -142,52 +156,22 @@ function CreateCategoryModal({
     },
   });
 
-  // Every time it opens, the dialog starts empty.
-  useEffect(() => {
-    if (!isOpen) return;
-    form.reset();
-    create.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening
-  }, [isOpen]);
-
   return (
-    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Container placement="auto">
-        <Modal.Dialog className="sm:max-w-sm">
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
-              <CirclePlus className="size-5" />
-            </Modal.Icon>
-            <Modal.Heading>{t("expenses.createCategory")}</Modal.Heading>
-          </Modal.Header>
-          <form.AppForm>
-            <Modal.Body>
-              <Message error={errorCode(create.error)} />
-              <FormStack id={formId} onSubmit={submitWith(form)}>
-                <form.AppField name="name">
-                  {field => <field.TextField label={t("expenses.categoryName")} type="text" required autoFocus />}
-                </form.AppField>
-                <form.AppField name="kind">
-                  {field => (
-                    <field.SelectField
-                      label={t("expenses.list")}
-                      isRequired
-                      options={categoryKinds.map(k => ({ id: k, label: t(k === "income" ? "type.income" : "type.expense") }))}
-                    />
-                  )}
-                </form.AppField>
-              </FormStack>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                {t("common.cancel")}
-              </Button>
-              <form.SubmitButton form={formId}>{t("expenses.createCategory")}</form.SubmitButton>
-            </Modal.Footer>
-          </form.AppForm>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+    <form.AppForm>
+      <form.ModalForm error={errorCode(create.error)} submitLabel={t("expenses.createCategory")}>
+        <form.AppField name="name">
+          {field => <field.TextField label={t("expenses.categoryName")} type="text" required autoFocus />}
+        </form.AppField>
+        <form.AppField name="kind">
+          {field => (
+            <field.SelectField
+              label={t("expenses.list")}
+              isRequired
+              options={categoryKinds.map(k => ({ id: k, label: t(k === "income" ? "type.income" : "type.expense") }))}
+            />
+          )}
+        </form.AppField>
+      </form.ModalForm>
+    </form.AppForm>
   );
 }

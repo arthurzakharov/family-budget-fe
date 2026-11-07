@@ -2,10 +2,18 @@
 // inside <form.AppField name="..."> the field components below read and write that field.
 // Inputs keep their `name` and native attributes (required, min...), so the browser still
 // checks them before the form is submitted.
-import type { ComponentProps, FormEvent, ReactNode } from "react";
+import { useId, type ComponentProps, type FormEvent, type ReactNode } from "react";
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
-import { Button, Tooltip } from "@heroui/react";
-import { CheckboxField as UiCheckbox, Field, SelectField as UiSelect, type Option } from "@client/components/ui";
+import { Button, Modal, Tooltip } from "@heroui/react";
+import { useI18n } from "@client/context/i18n";
+import {
+  CheckboxField as UiCheckbox,
+  Field,
+  FormStack,
+  Message,
+  SelectField as UiSelect,
+  type Option,
+} from "@client/components/ui";
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts();
 
@@ -90,12 +98,96 @@ function SubmitButton({ children, fullWidth, size, requireChange, form: formId, 
   );
 }
 
+// A form's body and footer inside a FormModal: the error (a translation key), one field per
+// line, then Cancel (closes the dialog) and the submit button.
+function ModalForm({
+  error,
+  submitLabel,
+  requireChange,
+  children,
+}: {
+  error?: string | null;
+  submitLabel: ReactNode;
+  // Keeps the submit button off until something is changed, e.g. for "Save changes"
+  requireChange?: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  const form = useFormContext();
+  const id = useId();
+  return (
+    <>
+      <Modal.Body>
+        <Message error={error} />
+        <FormStack id={id} onSubmit={submitWith(form)}>
+          {children}
+        </FormStack>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button slot="close" variant="secondary">
+          {t("common.cancel")}
+        </Button>
+        <SubmitButton form={id} requireChange={requireChange}>
+          {submitLabel}
+        </SubmitButton>
+      </Modal.Footer>
+    </>
+  );
+}
+
 export const { useAppForm } = createFormHook({
   fieldContext,
   formContext,
   fieldComponents: { TextField, SelectField, CheckboxField },
-  formComponents: { SubmitButton },
+  formComponents: { SubmitButton, ModalForm },
 });
+
+// Which record dialog is open: adding (record null) or editing a record. The record is kept
+// while the dialog closes, so its title does not change during the closing animation.
+export type RecordDialog<T> = { open: boolean; record: T | null };
+export const closedDialog = { open: false, record: null };
+
+// A dialog over a blurred page, for adding or editing something. Its contents are only mounted
+// while it is open, so a form inside starts afresh every time it opens.
+// Widths on larger screens; on phones every dialog is nearly full width.
+const modalWidths = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-lg" };
+
+export function FormModal({
+  isOpen,
+  onOpenChange,
+  title,
+  description,
+  icon,
+  size = "lg",
+  children,
+}: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  title: ReactNode;
+  // A line under the title
+  description?: ReactNode;
+  icon: ReactNode;
+  // "sm" for a field or two, "lg" for record forms
+  size?: keyof typeof modalWidths;
+  // Usually a form with <form.ModalForm> inside
+  children: ReactNode;
+}) {
+  return (
+    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container placement="auto">
+        <Modal.Dialog className={modalWidths[size]}>
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">{icon}</Modal.Icon>
+            <Modal.Heading>{title}</Modal.Heading>
+            {description && <p className="text-sm text-muted">{description}</p>}
+          </Modal.Header>
+          {children}
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  );
+}
 
 // The <form onSubmit> handler for a TanStack form.
 export const submitWith = (form: { handleSubmit: () => unknown }) => (e: FormEvent<HTMLFormElement>) => {

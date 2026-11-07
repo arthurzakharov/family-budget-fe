@@ -2,11 +2,9 @@ import { api, errorCode, request } from "@client/api";
 import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
-import { submitWith, useAppForm } from "@client/components/form";
+import { useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
 import { defaultGroup, GroupSelect } from "@client/components/GroupSelect";
-import { Button } from "@heroui/react";
-import { FormGrid, Message } from "@client/components/ui";
 import { coinName } from "@shared/crypto";
 import type { CoinSymbol, CryptoTransaction, Group, Member } from "@arthurzakharov/family-budget-be-client";
 
@@ -20,12 +18,11 @@ type Props = {
   coins: CoinSymbol[];
   // Called after the server has saved the transaction
   onSaved: () => void;
-  onCancel: () => void;
 };
 
-// Adds a buy or sell, or edits `editing` when given. It empties itself after adding.
-// The parent remounts it (with a key) so its starting values follow the record being edited.
-export function CryptoTransactionForm({ editing, groups, members, coins, onSaved, onCancel }: Props) {
+// Adds a buy or sell, or edits `editing` when given. Shown inside a FormModal,
+// which mounts it afresh each time it opens.
+export function CryptoTransactionForm({ editing, groups, members, coins, onSaved }: Props) {
   const { t } = useI18n();
   const me = useCurrentUser();
   // A record keeps its coin even after the admin turns that coin off.
@@ -48,7 +45,7 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
       amount: editing ? String(editing.amount) : "",
       price: editing ? String(editing.price) : "",
     },
-    onSubmit: async ({ value, formApi }) => {
+    onSubmit: async ({ value }) => {
       try {
         await save.mutateAsync({
           groupId: value.groupId,
@@ -63,27 +60,13 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
       } catch {
         return; // shown from save.error
       }
-      if (!editing) formApi.reset();
       onSaved();
     },
   });
 
   return (
     <form.AppForm>
-      <Message error={errorCode(save.error)} />
-      <FormGrid
-        onSubmit={submitWith(form)}
-        actions={
-          <>
-            <form.SubmitButton>{editing ? t("common.saveChanges") : t("transactions.add")}</form.SubmitButton>
-            {editing && (
-              <Button variant="secondary" onPress={onCancel}>
-                {t("common.cancel")}
-              </Button>
-            )}
-          </>
-        }
-      >
+      <form.ModalForm error={errorCode(save.error)} submitLabel={editing ? t("common.saveChanges") : t("transactions.add")}>
         {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
         <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         <form.AppField name="coin">
@@ -117,7 +100,7 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
         <form.AppField name="price">
           {field => <field.TextField label={t("crypto.rate")} type="number" required min="0" step="any" />}
         </form.AppField>
-      </FormGrid>
+      </form.ModalForm>
     </form.AppForm>
   );
 }

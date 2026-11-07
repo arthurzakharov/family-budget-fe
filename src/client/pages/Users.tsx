@@ -1,15 +1,15 @@
-import { useEffect, useId, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useDeleteMutation, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
-import { submitWith, useAppForm } from "@client/components/form";
+import { FormModal, submitWith, useAppForm } from "@client/components/form";
 import { GroupCheckboxes, RoleSelect, type AssignableRole } from "@client/components/users/RoleAndGroupFields";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
-import { Button, Chip, Input, Modal } from "@heroui/react";
+import { Button, Chip, Input } from "@heroui/react";
 import { Key, PersonGear, PersonPlus, TrashBin } from "@gravity-ui/icons";
-import { editingRow, FormStack, IconAction, IconActionGap, Message, PageHeader, Section } from "@client/components/ui";
+import { editingRow, IconAction, IconActionGap, Message, PageHeader, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
@@ -188,8 +188,8 @@ export function Users() {
   );
 }
 
-// The "Create user" dialog: name, password, role and groups. Closes once the user is created;
-// a failure is shown inside it, so nothing typed is lost.
+// The "Create user" dialog. Closes once the user is created; a failure is shown inside it, so
+// nothing typed is lost.
 function CreateUserModal({
   isOpen,
   onOpenChange,
@@ -202,7 +202,22 @@ function CreateUserModal({
   onCreated: () => void;
 }) {
   const { t } = useI18n();
-  const formId = useId();
+  return (
+    <FormModal
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      title={t("users.create")}
+      icon={<PersonPlus className="size-5" />}
+      size="md"
+    >
+      <CreateUserForm groups={groups} onCreated={onCreated} />
+    </FormModal>
+  );
+}
+
+// A new user's name, password, role and groups.
+function CreateUserForm({ groups, onCreated }: { groups: Group[]; onCreated: () => void }) {
+  const { t } = useI18n();
   // Users are also the members listed on the money pages, so those are fetched again.
   const create = useSaveMutation(queries.users, (json: NewUser) => request(api.users.$post({ json })), {
     invalidates: [queries.members.queryKey],
@@ -220,57 +235,27 @@ function CreateUserModal({
     },
   });
 
-  // Every time it opens, the dialog starts empty.
-  useEffect(() => {
-    if (!isOpen) return;
-    form.reset();
-    create.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening
-  }, [isOpen]);
-
   return (
-    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Container placement="auto">
-        <Modal.Dialog className="sm:max-w-md">
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
-              <PersonPlus className="size-5" />
-            </Modal.Icon>
-            <Modal.Heading>{t("users.create")}</Modal.Heading>
-          </Modal.Header>
-          <form.AppForm>
-            <Modal.Body>
-              <Message error={errorCode(create.error)} />
-              <FormStack id={formId} onSubmit={submitWith(form)}>
-                <form.AppField name="name">
-                  {field => <field.TextField label={t("users.name")} type="text" required autoFocus />}
-                </form.AppField>
-                <form.AppField name="password">
-                  {field => (
-                    <field.TextField
-                      label={t("auth.password")}
-                      type="password"
-                      required
-                      minLength={MIN_PASSWORD_LENGTH}
-                      autoComplete="new-password"
-                    />
-                  )}
-                </form.AppField>
-                <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
-                <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
-              </FormStack>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button slot="close" variant="secondary">
-                {t("common.cancel")}
-              </Button>
-              <form.SubmitButton form={formId}>{t("users.create")}</form.SubmitButton>
-            </Modal.Footer>
-          </form.AppForm>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+    <form.AppForm>
+      <form.ModalForm error={errorCode(create.error)} submitLabel={t("users.create")}>
+        <form.AppField name="name">
+          {field => <field.TextField label={t("users.name")} type="text" required autoFocus />}
+        </form.AppField>
+        <form.AppField name="password">
+          {field => (
+            <field.TextField
+              label={t("auth.password")}
+              type="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
+        <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
+      </form.ModalForm>
+    </form.AppForm>
   );
 }
 
