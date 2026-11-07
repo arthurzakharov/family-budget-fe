@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
-import { Button } from "@heroui/react";
+import { Button, Modal } from "@heroui/react";
+import { FolderPlus } from "@gravity-ui/icons";
 import { submitWith, useAppForm } from "@client/components/form";
-import { FormGrid, Message, PageHeader, Section } from "@client/components/ui";
+import { FormStack, Message, PageHeader, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
@@ -17,8 +18,9 @@ export function Groups() {
   const groups = useQuery(queries.groups).data ?? none;
   const users = useQuery(queries.users).data ?? none;
   const [error, setError] = useState<string | null>(null);
-
-  const create = useSaveMutation(queries.groups, (name: string) => request(api.groups.$post({ json: { name } })));
+  const [notice, setNotice] = useState<string | null>(null);
+  // Whether the "Create group" dialog is open
+  const [creating, setCreating] = useState(false);
 
   // Membership lives on the user, so update the user's groupIds in the cache after the server agrees.
   type Membership = { group: Group; userId: string; member: boolean };
@@ -47,18 +49,13 @@ export function Groups() {
       await change;
     } catch (err) {
       setError(errorCode(err));
+      setNotice(null);
       return false;
     }
     setError(null);
+    setNotice(null);
     return true;
   };
-
-  const createForm = useAppForm({
-    defaultValues: { name: "" },
-    onSubmit: async ({ value, formApi }) => {
-      if (await run(create.mutateAsync(value.name))) formApi.reset();
-    },
-  });
 
   const setMember = (group: Group, userId: string, member: boolean) =>
     run(membership.mutateAsync({ group, userId, member }));
@@ -82,22 +79,27 @@ export function Groups() {
 
   return (
     <>
-      <PageHeader title={t("nav.groups")} />
+      <PageHeader
+        title={t("nav.groups")}
+        actions={
+          <Button onPress={() => setCreating(true)}>
+            <FolderPlus className="size-4" />
+            {t("groups.create")}
+          </Button>
+        }
+      />
 
-      <Section title={t("groups.create")}>
-        <createForm.AppForm>
-          <FormGrid
-            onSubmit={submitWith(createForm)}
-            actions={<createForm.SubmitButton>{t("groups.create")}</createForm.SubmitButton>}
-          >
-            <createForm.AppField name="name">
-              {field => <field.TextField label={t("groups.name")} type="text" required />}
-            </createForm.AppField>
-          </FormGrid>
-        </createForm.AppForm>
-      </Section>
+      <CreateGroupModal
+        isOpen={creating}
+        onOpenChange={setCreating}
+        onCreated={() => {
+          setCreating(false);
+          setError(null);
+          setNotice("groups.created");
+        }}
+      />
 
-      <Message error={error} />
+      <Message error={error} success={notice} />
       {groups.length === 0 && <p className="text-sm text-muted">{t("groups.empty")}</p>}
 
       <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
@@ -152,5 +154,72 @@ function AddMemberForm({ users, onAdd }: { users: PublicUser[]; onAdd: (userId: 
         <form.SubmitButton>{t("groups.add")}</form.SubmitButton>
       </form>
     </form.AppForm>
+  );
+}
+
+// The "Create group" dialog. Closes once the group is created; a failure is shown inside it,
+// so the typed name is not lost.
+function CreateGroupModal({
+  isOpen,
+  onOpenChange,
+  onCreated,
+}: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onCreated: () => void;
+}) {
+  const { t } = useI18n();
+  const formId = useId();
+  const create = useSaveMutation(queries.groups, (name: string) => request(api.groups.$post({ json: { name } })));
+  const form = useAppForm({
+    defaultValues: { name: "" },
+    onSubmit: async ({ value }) => {
+      try {
+        await create.mutateAsync(value.name);
+      } catch {
+        return; // shown from create.error
+      }
+      onCreated();
+    },
+  });
+
+  // Every time it opens, the dialog starts empty.
+  useEffect(() => {
+    if (!isOpen) return;
+    form.reset();
+    create.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening
+  }, [isOpen]);
+
+  return (
+    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container placement="auto">
+        <Modal.Dialog className="sm:max-w-sm">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
+              <FolderPlus className="size-5" />
+            </Modal.Icon>
+            <Modal.Heading>{t("groups.create")}</Modal.Heading>
+          </Modal.Header>
+          <form.AppForm>
+            <Modal.Body>
+              <Message error={errorCode(create.error)} />
+              <FormStack id={formId} onSubmit={submitWith(form)}>
+                <form.AppField name="name">
+                  {field => <field.TextField label={t("groups.name")} type="text" required autoFocus />}
+                </form.AppField>
+              </FormStack>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">
+                {t("common.cancel")}
+              </Button>
+              <form.SubmitButton form={formId}>{t("groups.create")}</form.SubmitButton>
+            </Modal.Footer>
+          </form.AppForm>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }

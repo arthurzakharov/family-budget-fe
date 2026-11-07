@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, errorCode, request } from "@client/api";
 import { none, queries, useDeleteMutation, useSaveMutation } from "@client/queries";
@@ -7,8 +7,9 @@ import { useCurrentUser } from "@client/context/auth";
 import { submitWith, useAppForm } from "@client/components/form";
 import { GroupCheckboxes, RoleSelect, type AssignableRole } from "@client/components/users/RoleAndGroupFields";
 import { MIN_PASSWORD_LENGTH } from "@shared/validation";
-import { Button, Chip, Input } from "@heroui/react";
-import { editingRow, FormGrid, Message, PageHeader, RowActions, Section } from "@client/components/ui";
+import { Button, Chip, Input, Modal } from "@heroui/react";
+import { PersonPlus } from "@gravity-ui/icons";
+import { editingRow, FormStack, Message, PageHeader, RowActions, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Group, PublicUser } from "@arthurzakharov/family-budget-be-client";
 
@@ -26,16 +27,13 @@ export function Users() {
   // undefined while loading, so the create form only says "make a group first" once it knows.
   const groups = useQuery(queries.groups).data;
   const [editing, setEditing] = useState<Editing | null>(null);
+  // Whether the "Create user" dialog is open
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   // Users are also the members listed on the money pages, so those are fetched again after a change.
   const options = { invalidates: [queries.members.queryKey] };
-  const create = useSaveMutation(
-    queries.users,
-    (json: NewUser) => request(api.users.$post({ json })),
-    options,
-  );
   const update = useSaveMutation(
     queries.users,
     ({ id, json }: { id: string; json: RoleAndGroups }) =>
@@ -68,9 +66,7 @@ export function Users() {
     return true;
   };
 
-  // Each form gets one of these; it resolves to true when the change worked.
-  const onCreate = (json: NewUser) => run(create.mutateAsync(json), "users.created");
-
+  // The row forms get one of these; it resolves to true when the change worked.
   const onChangePassword = async (user: PublicUser, password: string) =>
     (await run(changePassword.mutateAsync({ id: user.id, password }), "users.passwordChanged")) && setEditing(null);
 
@@ -146,14 +142,27 @@ export function Users() {
 
   return (
     <>
-      <PageHeader title={t("nav.users")} />
+      <PageHeader
+        title={t("nav.users")}
+        // A user must belong to a group, so users can only be created once a group exists.
+        description={groups?.length === 0 ? t("users.noGroupsHint") : undefined}
+        actions={
+          <Button onPress={() => setCreating(true)} isDisabled={!groups?.length}>
+            <PersonPlus className="size-4" />
+            {t("users.create")}
+          </Button>
+        }
+      />
 
-      <Section title={t("users.create")} description={groups?.length === 0 ? t("users.noGroupsHint") : undefined}>
-        {/* A user must belong to a group, so the form is disabled until one exists. */}
-        <fieldset disabled={!groups?.length} className="min-w-0">
-          <CreateUserForm groups={groups ?? []} onCreate={onCreate} />
-        </fieldset>
-      </Section>
+      <CreateUserModal
+        isOpen={creating}
+        onOpenChange={setCreating}
+        groups={groups ?? []}
+        onCreated={() => {
+          setCreating(false);
+          report(null, "users.created");
+        }}
+      />
 
       <Message error={error} success={message} />
 
@@ -171,36 +180,89 @@ export function Users() {
   );
 }
 
-// A new user's name, password, role and groups. Empties itself once the user is created.
-function CreateUserForm({ groups, onCreate }: { groups: Group[]; onCreate: (json: NewUser) => Promise<boolean> }) {
+// The "Create user" dialog: name, password, role and groups. Closes once the user is created;
+// a failure is shown inside it, so nothing typed is lost.
+function CreateUserModal({
+  isOpen,
+  onOpenChange,
+  groups,
+  onCreated,
+}: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  groups: Group[];
+  onCreated: () => void;
+}) {
   const { t } = useI18n();
+  const formId = useId();
+  // Users are also the members listed on the money pages, so those are fetched again.
+  const create = useSaveMutation(queries.users, (json: NewUser) => request(api.users.$post({ json })), {
+    invalidates: [queries.members.queryKey],
+  });
   const form = useAppForm({
     defaultValues: { name: "", password: "", role: "" as AssignableRole | "", groupIds: [] as string[] },
-    onSubmit: async ({ value, formApi }) => {
-      // The browser makes sure a role is picked.
-      if (await onCreate({ ...value, role: value.role as AssignableRole })) formApi.reset();
+    onSubmit: async ({ value }) => {
+      try {
+        // The browser makes sure a role is picked.
+        await create.mutateAsync({ ...value, role: value.role as AssignableRole });
+      } catch {
+        return; // shown from create.error
+      }
+      onCreated();
     },
   });
 
+  // Every time it opens, the dialog starts empty.
+  useEffect(() => {
+    if (!isOpen) return;
+    form.reset();
+    create.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening
+  }, [isOpen]);
+
   return (
-    <form.AppForm>
-      <FormGrid onSubmit={submitWith(form)} actions={<form.SubmitButton>{t("users.create")}</form.SubmitButton>}>
-        <form.AppField name="name">{field => <field.TextField label={t("users.name")} type="text" required />}</form.AppField>
-        <form.AppField name="password">
-          {field => (
-            <field.TextField
-              label={t("auth.password")}
-              type="password"
-              required
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-            />
-          )}
-        </form.AppField>
-        <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
-        <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
-      </FormGrid>
-    </form.AppForm>
+    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container placement="auto">
+        <Modal.Dialog className="sm:max-w-md">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
+              <PersonPlus className="size-5" />
+            </Modal.Icon>
+            <Modal.Heading>{t("users.create")}</Modal.Heading>
+          </Modal.Header>
+          <form.AppForm>
+            <Modal.Body>
+              <Message error={errorCode(create.error)} />
+              <FormStack id={formId} onSubmit={submitWith(form)}>
+                <form.AppField name="name">
+                  {field => <field.TextField label={t("users.name")} type="text" required autoFocus />}
+                </form.AppField>
+                <form.AppField name="password">
+                  {field => (
+                    <field.TextField
+                      label={t("auth.password")}
+                      type="password"
+                      required
+                      minLength={MIN_PASSWORD_LENGTH}
+                      autoComplete="new-password"
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="role">{() => <RoleSelect />}</form.AppField>
+                <form.AppField name="groupIds">{() => <GroupCheckboxes groups={groups} />}</form.AppField>
+              </FormStack>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">
+                {t("common.cancel")}
+              </Button>
+              <form.SubmitButton form={formId}>{t("users.create")}</form.SubmitButton>
+            </Modal.Footer>
+          </form.AppForm>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 

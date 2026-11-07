@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { api, errorCode, request, type JsonRequest } from "@client/api";
 import { queries, useReplaceMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
 import { categoryKinds } from "@shared/expenses";
-import { Chip, Switch } from "@heroui/react";
+import { Button, Chip, Modal, Switch } from "@heroui/react";
+import { CirclePlus } from "@gravity-ui/icons";
 import { submitWith, useAppForm } from "@client/components/form";
-import { FormGrid, Message, Section } from "@client/components/ui";
+import { FormStack, Message, Section } from "@client/components/ui";
 import { RecordTable, recordColumns } from "@client/components/RecordTable";
 import type { Category, CategoryKind } from "@arthurzakharov/family-budget-be-client";
 
@@ -19,6 +20,8 @@ export function Categories() {
   const { categories } = useExpenses();
   const categoryName = useCategoryName();
   const [notice, setNotice] = useState<string | null>(null);
+  // Whether the "Create category" dialog is open
+  const [creating, setCreating] = useState(false);
 
   // Both endpoints answer with the full, updated category list.
   const save = useReplaceMutation(queries.expenseCategories, (req: () => JsonRequest<Category[]>) => request(req()));
@@ -32,16 +35,6 @@ export function Categories() {
     setNotice(null);
     send(() => api.expenses.categories[":id"].$put({ param: { id: c.id }, json: { hidden: !visible } }));
   };
-
-  const createForm = useAppForm({
-    defaultValues: { name: "", kind: "expense" as CategoryKind },
-    onSubmit: async ({ value, formApi }) => {
-      if (await send(() => api.expenses.categories.$post({ json: value }))) {
-        formApi.reset();
-        setNotice("expenses.categoryCreated");
-      }
-    },
-  });
 
   const columns = [
     column.accessor(c => categoryName(t, c.id), {
@@ -92,32 +85,109 @@ export function Categories() {
 
   return (
     <>
-      <Section title={t("expenses.createCategory")} description={t("expenses.categoriesHint")}>
-        <Message error={errorCode(save.error)} success={notice} />
-        <createForm.AppForm>
-          <FormGrid
-            onSubmit={submitWith(createForm)}
-            actions={<createForm.SubmitButton>{t("expenses.createCategory")}</createForm.SubmitButton>}
-          >
-            <createForm.AppField name="name">
-              {field => <field.TextField label={t("expenses.categoryName")} type="text" required />}
-            </createForm.AppField>
-            <createForm.AppField name="kind">
-              {field => (
-                <field.SelectField
-                  label={t("expenses.list")}
-                  isRequired
-                  options={categoryKinds.map(k => ({ id: k, label: t(k === "income" ? "type.income" : "type.expense") }))}
-                />
-              )}
-            </createForm.AppField>
-          </FormGrid>
-        </createForm.AppForm>
-      </Section>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <p className="text-sm text-muted">{t("expenses.categoriesHint")}</p>
+        <Button onPress={() => setCreating(true)}>
+          <CirclePlus className="size-4" />
+          {t("expenses.createCategory")}
+        </Button>
+      </div>
+
+      <CreateCategoryModal
+        isOpen={creating}
+        onOpenChange={setCreating}
+        onCreated={() => {
+          setCreating(false);
+          save.reset();
+          setNotice("expenses.categoryCreated");
+        }}
+      />
+
+      <Message error={errorCode(save.error)} success={notice} />
+
       <div className="grid items-start gap-x-6 lg:grid-cols-2 [&>*]:min-w-0">
         {list("expense")}
         {list("income")}
       </div>
     </>
+  );
+}
+
+// The "Create category" dialog: a name and the list (income or expenses) it goes in. Closes once
+// the category is created; a failure is shown inside it, so nothing typed is lost.
+function CreateCategoryModal({
+  isOpen,
+  onOpenChange,
+  onCreated,
+}: {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onCreated: () => void;
+}) {
+  const { t } = useI18n();
+  const formId = useId();
+  // The server answers with the full, updated category list.
+  const create = useReplaceMutation(queries.expenseCategories, (json: { name: string; kind: CategoryKind }) =>
+    request(api.expenses.categories.$post({ json })),
+  );
+  const form = useAppForm({
+    defaultValues: { name: "", kind: "expense" as CategoryKind },
+    onSubmit: async ({ value }) => {
+      try {
+        await create.mutateAsync(value);
+      } catch {
+        return; // shown from create.error
+      }
+      onCreated();
+    },
+  });
+
+  // Every time it opens, the dialog starts empty.
+  useEffect(() => {
+    if (!isOpen) return;
+    form.reset();
+    create.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening
+  }, [isOpen]);
+
+  return (
+    <Modal.Backdrop variant="blur" isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container placement="auto">
+        <Modal.Dialog className="sm:max-w-sm">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Icon className="bg-accent-soft text-accent-soft-foreground">
+              <CirclePlus className="size-5" />
+            </Modal.Icon>
+            <Modal.Heading>{t("expenses.createCategory")}</Modal.Heading>
+          </Modal.Header>
+          <form.AppForm>
+            <Modal.Body>
+              <Message error={errorCode(create.error)} />
+              <FormStack id={formId} onSubmit={submitWith(form)}>
+                <form.AppField name="name">
+                  {field => <field.TextField label={t("expenses.categoryName")} type="text" required autoFocus />}
+                </form.AppField>
+                <form.AppField name="kind">
+                  {field => (
+                    <field.SelectField
+                      label={t("expenses.list")}
+                      isRequired
+                      options={categoryKinds.map(k => ({ id: k, label: t(k === "income" ? "type.income" : "type.expense") }))}
+                    />
+                  )}
+                </form.AppField>
+              </FormStack>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button slot="close" variant="secondary">
+                {t("common.cancel")}
+              </Button>
+              <form.SubmitButton form={formId}>{t("expenses.createCategory")}</form.SubmitButton>
+            </Modal.Footer>
+          </form.AppForm>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }

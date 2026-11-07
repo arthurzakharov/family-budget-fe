@@ -53,15 +53,17 @@ type SubmitButtonProps = {
   size?: ComponentProps<typeof Button>["size"];
   // Also disabled while every field still has its starting value, e.g. for "Save changes".
   requireChange?: boolean;
+  // The id of the <form> it submits, when the button sits outside it (e.g. in a modal's footer)
+  form?: string;
 };
 
 // The form's submit button; disabled while the form is being sent, so it cannot go twice.
-function SubmitButton({ children, fullWidth, size, requireChange }: SubmitButtonProps) {
+function SubmitButton({ children, fullWidth, size, requireChange, form: formId }: SubmitButtonProps) {
   const form = useFormContext();
   return (
     <form.Subscribe selector={state => state.isSubmitting || (requireChange === true && state.isDefaultValue)}>
       {isDisabled => (
-        <Button type="submit" fullWidth={fullWidth} size={size} isDisabled={isDisabled}>
+        <Button type="submit" form={formId} fullWidth={fullWidth} size={size} isDisabled={isDisabled}>
           {children}
         </Button>
       )}

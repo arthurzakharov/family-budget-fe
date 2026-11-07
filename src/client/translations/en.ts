@@ -115,6 +115,8 @@ export const en = {
   "crypto.coins": "Coins",
   "crypto.coinsHint": "Pick the coins that can be used for new records. Records of a coin you turn off stay as they are.",
   "crypto.available": "Available",
+  "crypto.chooseCoins": "Choose coins",
+  "crypto.noCoins": "No coins are available yet",
   "crypto.name": "Name",
   "crypto.coin": "Coin",
   "crypto.selectCoin": "Select coin",
@@ -195,6 +197,7 @@ export const en = {
 
   "groups.name": "Group name",
   "groups.create": "Create group",
+  "groups.created": "Group created",
   "groups.empty": "No groups yet",
   "groups.noMembers": "No users in this group",
   "groups.add": "Add to group",

@@ -69,9 +69,18 @@ export function FormGrid({
 }
 
 // A form with one field per line, for narrow places such as the login card.
-export function FormStack({ onSubmit, children }: { onSubmit: (e: FormEvent<HTMLFormElement>) => void; children: ReactNode }) {
+// `id` lets a submit button outside the form (e.g. in a modal's footer) send it.
+export function FormStack({
+  id,
+  onSubmit,
+  children,
+}: {
+  id?: string;
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  children: ReactNode;
+}) {
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form id={id} onSubmit={onSubmit} className="flex flex-col gap-4">
       {children}
     </form>
   );

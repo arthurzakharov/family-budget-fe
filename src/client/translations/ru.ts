@@ -118,6 +118,8 @@ export const ru: Record<TranslationKey, string> = {
   "crypto.coins": "Монеты",
   "crypto.coinsHint": "Выберите монеты, которые можно использовать в новых записях. Записи отключённой монеты останутся как есть.",
   "crypto.available": "Доступна",
+  "crypto.chooseCoins": "Выбрать монеты",
+  "crypto.noCoins": "Пока нет доступных монет",
   "crypto.name": "Название",
   "crypto.coin": "Монета",
   "crypto.selectCoin": "Выберите монету",
@@ -198,6 +200,7 @@ export const ru: Record<TranslationKey, string> = {
 
   "groups.name": "Название группы",
   "groups.create": "Создать группу",
+  "groups.created": "Группа создана",
   "groups.empty": "Групп пока нет",
   "groups.noMembers": "В этой группе нет пользователей",
   "groups.add": "Добавить в группу",
