@@ -2,7 +2,7 @@ import { api, errorCode, request } from "@client/api";
 import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
-import { useAppForm } from "@client/components/form";
+import { todayText, useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
 import { defaultGroup, GroupSelect } from "@client/components/GroupSelect";
 import { coinName } from "@shared/crypto";
@@ -41,7 +41,8 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
       groupId: defaultGroup(me, editing?.groupId),
       coin: editing?.coin ?? "",
       type: editing?.type ?? "buy",
-      date: editing?.date ?? "",
+      // New records are dated today.
+      date: editing?.date ?? todayText(),
       amount: editing ? String(editing.amount) : "",
       price: editing ? String(editing.price) : "",
     },
@@ -92,7 +93,7 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
           )}
         </form.AppField>
         <form.AppField name="date">
-          {field => <field.DatePickerField label={t("common.date")} isRequired />}
+          {field => <field.DatePickerField label={t("common.date")} isRequired quickPicks />}
         </form.AppField>
         <form.AppField name="amount">
           {field => <field.TextField label={t("crypto.amount")} type="number" required min="0" step="any" />}

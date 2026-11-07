@@ -155,6 +155,8 @@ export const ru: Record<TranslationKey, string> = {
   "common.loading": "Загрузка…",
   "common.saveChanges": "Сохранить изменения",
   "common.date": "Дата",
+  "common.today": "Сегодня",
+  "common.yesterday": "Вчера",
   "common.tax": "Налог",
   "common.balance": "Баланс",
   "common.total": "Итого",

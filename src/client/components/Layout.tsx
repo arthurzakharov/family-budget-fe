@@ -26,7 +26,7 @@ const navItems: NavItem[] = [
 ];
 
 const linkClass =
-  "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-2.5 py-1.5 md:px-3 text-sm font-medium text-muted outline-none transition-colors duration-500 hover:bg-default hover:text-foreground focus-visible:bg-default focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
+  "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 md:px-4 text-base font-medium text-muted outline-none transition-colors duration-500 hover:bg-default hover:text-foreground focus-visible:bg-default focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-focus";
 const activeClass = "!bg-accent !text-accent-foreground";
 
 export function Layout() {
@@ -54,7 +54,7 @@ export function Layout() {
                   activeProps={{ className: activeClass }}
                   activeOptions={{ exact: to === "/" }}
                 >
-                  <Icon className="size-4 shrink-0" />
+                  <Icon className="size-5 shrink-0" />
                   <span className="sr-only md:not-sr-only">{t(label)}</span>
                 </Link>
               ))}
@@ -62,13 +62,13 @@ export function Layout() {
 
           <div className="flex shrink-0 items-center gap-2">
             <Tooltip delay={300}>
-              <Button isIconOnly size="sm" variant="ghost" aria-label={t(`theme.${nextTheme}`)} onPress={() => setTheme(nextTheme)}>
-                {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              <Button isIconOnly variant="ghost" aria-label={t(`theme.${nextTheme}`)} onPress={() => setTheme(nextTheme)}>
+                {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
               </Button>
               <Tooltip.Content>{t(`theme.${nextTheme}`)}</Tooltip.Content>
             </Tooltip>
             <Link to="/settings" className="hidden items-center gap-2 sm:flex" aria-label={user.name}>
-              <Avatar size="sm">
+              <Avatar>
                 <Avatar.Fallback>{user.name.slice(0, 2).toUpperCase()}</Avatar.Fallback>
               </Avatar>
               <span className="hidden text-sm font-medium lg:inline">{user.name}</span>

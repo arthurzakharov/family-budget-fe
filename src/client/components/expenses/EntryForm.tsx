@@ -4,7 +4,7 @@ import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { useCategoryName, useExpenses } from "@client/context/expenses";
-import { useAppForm } from "@client/components/form";
+import { todayText, useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
 import { defaultGroup, GroupSelect } from "@client/components/GroupSelect";
 import { kindOf, MAX_NOTE_LENGTH } from "@shared/expenses";
@@ -40,7 +40,8 @@ export function EntryForm({ editing, onSaved }: Props) {
       // Picking expense or income first narrows the category list to that list. Not sent.
       kind: (editing ? kindOf(categories, editing.categoryId) : "income") as CategoryKind,
       categoryId: editing?.categoryId ?? "",
-      date: editing?.date ?? "",
+      // New records are dated today.
+      date: editing?.date ?? todayText(),
       amount: editing ? String(editing.amountCents / 100) : "",
       note: editing?.note ?? "",
     },
@@ -93,7 +94,7 @@ export function EntryForm({ editing, onSaved }: Props) {
           )}
         </form.AppField>
         <form.AppField name="date">
-          {field => <field.DatePickerField label={t("common.date")} isRequired />}
+          {field => <field.DatePickerField label={t("common.date")} isRequired quickPicks />}
         </form.AppField>
         <form.AppField name="amount">
           {field => <field.TextField label={t("transactions.amount")} type="number" required min="0.01" step="0.01" />}

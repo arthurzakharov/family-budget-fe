@@ -152,6 +152,8 @@ export const en = {
   "common.loading": "Loading…",
   "common.saveChanges": "Save changes",
   "common.date": "Date",
+  "common.today": "Today",
+  "common.yesterday": "Yesterday",
   "common.tax": "Tax",
   "common.balance": "Balance",
   "common.total": "Total",

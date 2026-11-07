@@ -2,7 +2,7 @@ import { api, errorCode, request, toCents } from "@client/api";
 import { queries, useSaveMutation } from "@client/queries";
 import { useI18n } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
-import { useAppForm } from "@client/components/form";
+import { todayText, useAppForm } from "@client/components/form";
 import { UserSelect } from "@client/components/UserSelect";
 import { defaultGroup, GroupSelect } from "@client/components/GroupSelect";
 import type { DepositTransaction, Group, Member } from "@arthurzakharov/family-budget-be-client";
@@ -39,7 +39,8 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
       userId: editing?.userId ?? "",
       groupId: defaultGroup(me, editing?.groupId),
       type: editing?.type ?? "deposit",
-      date: editing?.date ?? "",
+      // New records are dated today.
+      date: editing?.date ?? todayText(),
       amount: editing ? String(editing.amountCents / 100) : "",
     },
     onSubmit: async ({ value }) => {
@@ -76,7 +77,7 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
           )}
         </form.AppField>
         <form.AppField name="date">
-          {field => <field.DatePickerField label={t("common.date")} isRequired />}
+          {field => <field.DatePickerField label={t("common.date")} isRequired quickPicks />}
         </form.AppField>
         <form.AppField name="amount">
           {field => <field.TextField label={t("transactions.amount")} type="number" required min="0.01" step="0.01" />}

@@ -15,7 +15,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from "@heroui/react";
-import { parseDate, type DateValue } from "@internationalized/date";
+import { getLocalTimeZone, parseDate, today, type DateValue } from "@internationalized/date";
 import { I18nProvider } from "react-aria-components";
 import { useI18n } from "@client/context/i18n";
 import {
@@ -94,59 +94,102 @@ function toDateValue(text: string): DateValue | null {
   }
 }
 
+// Today and yesterday on this device, as "YYYY-MM-DD"
+export const todayText = () => today(getLocalTimeZone()).toString();
+const yesterdayText = () => today(getLocalTimeZone()).subtract({ days: 1 }).toString();
+
 // A date typed into its parts or picked from HeroUI's calendar. The field holds "YYYY-MM-DD"
 // (what the backend expects), or "" while empty. Months and weekdays follow the app's language.
+// With `quickPicks`, a Today | Yesterday button group sits beside it; the one matching the
+// date is selected, and picking another date in the calendar selects neither.
 function DatePickerField({
   label,
   isRequired,
   isDisabled,
+  quickPicks = false,
 }: {
   label: ReactNode;
   isRequired?: boolean;
   isDisabled?: boolean;
+  quickPicks?: boolean;
 }) {
   const field = useFieldContext<string>();
-  const { language } = useI18n();
+  const { t, language } = useI18n();
+  const labelId = useId();
+  const value = field.state.value;
+  const quick = { today: todayText(), yesterday: yesterdayText() };
+  const picked = value === quick.today ? "today" : value === quick.yesterday ? "yesterday" : null;
+
   return (
     <I18nProvider locale={dateLocales[language]}>
-      <DatePicker
-        className="w-full"
-        name={field.name}
-        value={toDateValue(field.state.value)}
-        onChange={date => field.handleChange(date ? date.toString() : "")}
-        onBlur={field.handleBlur}
-        isRequired={isRequired}
-        isDisabled={isDisabled}
-      >
-        <Label>{label}</Label>
-        <DateField.Group fullWidth variant="secondary">
-          <DateField.Input>{segment => <DateField.Segment segment={segment} />}</DateField.Input>
-          <DateField.Suffix>
-            <DatePicker.Trigger>
-              <DatePicker.TriggerIndicator />
-            </DatePicker.Trigger>
-          </DateField.Suffix>
-        </DateField.Group>
-        <DatePicker.Popover>
-          <Calendar aria-label={typeof label === "string" ? label : undefined}>
-            <Calendar.Header>
-              <Calendar.YearPickerTrigger>
-                <Calendar.YearPickerTriggerHeading />
-                <Calendar.YearPickerTriggerIndicator />
-              </Calendar.YearPickerTrigger>
-              <Calendar.NavButton slot="previous" />
-              <Calendar.NavButton slot="next" />
-            </Calendar.Header>
-            <Calendar.Grid>
-              <Calendar.GridHeader>{day => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}</Calendar.GridHeader>
-              <Calendar.GridBody>{date => <Calendar.Cell date={date} />}</Calendar.GridBody>
-            </Calendar.Grid>
-            <Calendar.YearPickerGrid>
-              <Calendar.YearPickerGridBody>{({ year }) => <Calendar.YearPickerCell year={year} />}</Calendar.YearPickerGridBody>
-            </Calendar.YearPickerGrid>
-          </Calendar>
-        </DatePicker.Popover>
-      </DatePicker>
+      <div className="flex flex-col gap-1">
+        {/* Outside the picker so it labels the button group's row as well */}
+        <Label id={labelId} isRequired={isRequired}>
+          {label}
+        </Label>
+        <div className="flex items-center gap-2">
+          <DatePicker
+            className="min-w-0 flex-1"
+            aria-labelledby={labelId}
+            name={field.name}
+            value={toDateValue(value)}
+            onChange={date => field.handleChange(date ? date.toString() : "")}
+            onBlur={field.handleBlur}
+            isRequired={isRequired}
+            isDisabled={isDisabled}
+          >
+            <DateField.Group fullWidth variant="secondary">
+              <DateField.Input>{segment => <DateField.Segment segment={segment} />}</DateField.Input>
+              <DateField.Suffix>
+                <DatePicker.Trigger>
+                  <DatePicker.TriggerIndicator />
+                </DatePicker.Trigger>
+              </DateField.Suffix>
+            </DateField.Group>
+            <DatePicker.Popover>
+              <Calendar aria-label={typeof label === "string" ? label : undefined}>
+                <Calendar.Header>
+                  <Calendar.YearPickerTrigger>
+                    <Calendar.YearPickerTriggerHeading />
+                    <Calendar.YearPickerTriggerIndicator />
+                  </Calendar.YearPickerTrigger>
+                  <Calendar.NavButton slot="previous" />
+                  <Calendar.NavButton slot="next" />
+                </Calendar.Header>
+                <Calendar.Grid>
+                  <Calendar.GridHeader>{day => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}</Calendar.GridHeader>
+                  <Calendar.GridBody>{date => <Calendar.Cell date={date} />}</Calendar.GridBody>
+                </Calendar.Grid>
+                <Calendar.YearPickerGrid>
+                  <Calendar.YearPickerGridBody>
+                    {({ year }) => <Calendar.YearPickerCell year={year} />}
+                  </Calendar.YearPickerGridBody>
+                </Calendar.YearPickerGrid>
+              </Calendar>
+            </DatePicker.Popover>
+          </DatePicker>
+          {quickPicks && (
+            <ToggleButtonGroup
+              aria-labelledby={labelId}
+              selectionMode="single"
+              isDisabled={isDisabled}
+              className="shrink-0"
+              selectedKeys={picked ? [picked] : []}
+              onSelectionChange={keys => {
+                const [key] = keys;
+                // Pressing the selected one again keeps its date.
+                if (key === "today" || key === "yesterday") field.handleChange(quick[key]);
+              }}
+            >
+              <ToggleButton id="today">{t("common.today")}</ToggleButton>
+              <ToggleButton id="yesterday">
+                <ToggleButtonGroup.Separator />
+                {t("common.yesterday")}
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
+        </div>
+      </div>
     </I18nProvider>
   );
 }
