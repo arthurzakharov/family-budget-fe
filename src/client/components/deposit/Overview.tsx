@@ -1,4 +1,6 @@
+import { Vault } from "@gravity-ui/icons";
 import { useI18n } from "@client/context/i18n";
+import { NoRecords } from "@client/components/NoRecords";
 import { useDeposit } from "@client/context/deposit";
 import { RateTable } from "@client/components/deposit/RateTable";
 import { TransactionTable } from "@client/components/deposit/TransactionTable";
@@ -18,8 +20,13 @@ type Props = {
 // Read-only view of the deposit, narrowed to some groups.
 export function Overview({ groupIds, showRates = false }: Props) {
   const { t } = useI18n();
-  const { groups, members, transactions, rates, interest } = useDeposit();
+  const { groups, members, transactions, rates, interest, isLoading } = useDeposit();
   const shown = transactions.filter(tx => groupIds.includes(tx.groupId));
+  // Nothing recorded for these groups yet (once the data has arrived): say so instead of
+  // showing empty tables and zero totals.
+  if (!isLoading && shown.length === 0) {
+    return <NoRecords icon={Vault} title="empty.deposit" manage="/deposit/manage" />;
+  }
   const view = forGroups(interest, groupIds);
 
   return (

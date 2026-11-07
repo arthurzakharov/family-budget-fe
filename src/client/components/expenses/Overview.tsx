@@ -1,4 +1,6 @@
+import { Receipt } from "@gravity-ui/icons";
 import { useI18n } from "@client/context/i18n";
+import { NoRecords } from "@client/components/NoRecords";
 import { useExpenses } from "@client/context/expenses";
 import { CategoryTotalsTable } from "@client/components/expenses/CategoryTotalsTable";
 import { GroupTotalsTable } from "@client/components/expenses/GroupTotalsTable";
@@ -10,8 +12,13 @@ import { summarizeEntries } from "@shared/expenses";
 // Read-only view of income and expenses, narrowed to some groups.
 export function Overview({ groupIds }: { groupIds: string[] }) {
   const { t } = useI18n();
-  const { groups, categories, entries } = useExpenses();
+  const { groups, categories, entries, isLoading } = useExpenses();
   const shown = entries.filter(e => groupIds.includes(e.groupId));
+  // Nothing recorded for these groups yet (once the data has arrived): say so instead of
+  // showing empty tables and zero totals.
+  if (!isLoading && shown.length === 0) {
+    return <NoRecords icon={Receipt} title="empty.expenses" manage="/expenses/manage" />;
+  }
   const summary = summarizeEntries(shown, categories, groupIds);
 
   return (

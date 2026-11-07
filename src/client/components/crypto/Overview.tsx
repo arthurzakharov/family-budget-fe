@@ -1,4 +1,6 @@
+import { ChartLine } from "@gravity-ui/icons";
 import { useI18n } from "@client/context/i18n";
+import { NoRecords } from "@client/components/NoRecords";
 import { useCrypto } from "@client/context/crypto";
 import { HoldingsTable } from "@client/components/crypto/HoldingsTable";
 import { PricesUpdater } from "@client/components/crypto/PricesUpdater";
@@ -16,8 +18,13 @@ type Props = {
 // Read-only view of the crypto holdings, narrowed to some groups.
 export function Overview({ groupIds }: Props) {
   const { t } = useI18n();
-  const { groups, members, transactions, prices } = useCrypto();
+  const { groups, members, transactions, prices, isLoading } = useCrypto();
   const shown = transactions.filter(tx => groupIds.includes(tx.groupId));
+  // Nothing recorded for these groups yet (once the data has arrived): say so instead of
+  // showing empty tables and zero totals.
+  if (!isLoading && shown.length === 0) {
+    return <NoRecords icon={ChartLine} title="empty.crypto" manage="/crypto/manage" />;
+  }
   const summary = summarizeCrypto(shown, prices, groupIds);
   const gain = summary.value - summary.added;
 
