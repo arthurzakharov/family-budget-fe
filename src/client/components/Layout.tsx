@@ -1,7 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 import { Link, Outlet, type LinkProps } from "@tanstack/react-router";
 import { Avatar, Button, Tooltip } from "@heroui/react";
-import { ChartLine, Folder, Gear, House, Moon, Persons, Receipt, Sun, Vault } from "@gravity-ui/icons";
+import { ChartLine, Folder, House, Moon, Persons, Receipt, Sun, Vault } from "@gravity-ui/icons";
 import { useI18n, type TranslationKey } from "@client/context/i18n";
 import { useCurrentUser } from "@client/context/auth";
 import { useTheme } from "@client/context/theme";
@@ -22,7 +22,6 @@ const navItems: NavItem[] = [
   { to: "/expenses", label: "nav.expenses", icon: Receipt },
   { to: "/users", label: "nav.users", icon: Persons, adminOnly: true },
   { to: "/groups", label: "nav.groups", icon: Folder, adminOnly: true },
-  { to: "/settings", label: "nav.settings", icon: Gear },
 ];
 
 const linkClass =
@@ -67,8 +66,13 @@ export function Layout() {
               </Button>
               <Tooltip.Content>{t(`theme.${nextTheme}`)}</Tooltip.Content>
             </Tooltip>
-            <Link to="/settings" className="hidden items-center gap-2 sm:flex" aria-label={user.name}>
-              <Avatar>
+            {/* Settings open from the user's avatar. */}
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus [&[data-status=active]_.avatar]:ring-2 [&[data-status=active]_.avatar]:ring-accent"
+              aria-label={t("nav.settings")}
+            >
+              <Avatar className="avatar">
                 <Avatar.Fallback>{user.name.slice(0, 2).toUpperCase()}</Avatar.Fallback>
               </Avatar>
               <span className="hidden text-sm font-medium lg:inline">{user.name}</span>

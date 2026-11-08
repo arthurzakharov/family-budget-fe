@@ -69,6 +69,17 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
   return (
     <form.AppForm>
       <form.ModalForm error={errorCode(save.error)} submitLabel={editing ? t("common.saveChanges") : t("transactions.add")}>
+        <form.AppField name="type">
+          {field => (
+            <field.ToggleField
+              label={t("transactions.type")}
+              options={[
+                { id: "buy", label: t("type.buy"), tone: "success" },
+                { id: "sell", label: t("type.sell"), tone: "danger" },
+              ]}
+            />
+          )}
+        </form.AppField>
         {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
         <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         <form.AppField name="coin">
@@ -78,17 +89,6 @@ export function CryptoTransactionForm({ editing, groups, members, coins, onSaved
               isRequired
               placeholder={t("crypto.selectCoin")}
               options={coinOptions.map(c => ({ id: c, label: `${c} – ${coinName(c)}` }))}
-            />
-          )}
-        </form.AppField>
-        <form.AppField name="type">
-          {field => (
-            <field.ToggleField
-              label={t("transactions.type")}
-              options={[
-                { id: "buy", label: t("type.buy"), tone: "success" },
-                { id: "sell", label: t("type.sell"), tone: "danger" },
-              ]}
             />
           )}
         </form.AppField>

@@ -21,6 +21,8 @@ export const queryClient = new QueryClient({
 export const queries = {
   groups: queryOptions({ queryKey: ["groups"], queryFn: () => request(api.groups.$get()) }),
   members: queryOptions({ queryKey: ["members"], queryFn: () => request(api.members.$get()) }),
+  // The workspace's login email
+  workspace: queryOptions({ queryKey: ["workspace"], queryFn: () => request(api.auth.workspace.$get()) }),
   // Admin only
   users: queryOptions({ queryKey: ["users"], queryFn: () => request(api.users.$get()) }),
 

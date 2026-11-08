@@ -63,8 +63,6 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
   return (
     <form.AppForm>
       <form.ModalForm error={errorCode(save.error)} submitLabel={editing ? t("common.saveChanges") : t("transactions.add")}>
-        {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
-        <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         <form.AppField name="type">
           {field => (
             <field.ToggleField
@@ -76,6 +74,8 @@ export function TransactionForm({ editing, groups, members, onSaved }: Props) {
             />
           )}
         </form.AppField>
+        {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
+        <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         <form.AppField name="date">
           {field => <field.DatePickerField label={t("common.date")} isRequired quickPicks />}
         </form.AppField>

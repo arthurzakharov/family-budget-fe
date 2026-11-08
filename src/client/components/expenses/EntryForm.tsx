@@ -69,8 +69,6 @@ export function EntryForm({ editing, onSaved }: Props) {
   return (
     <form.AppForm>
       <form.ModalForm error={errorCode(save.error)} submitLabel={editing ? t("common.saveChanges") : t("expenses.add")}>
-        {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
-        <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         {/* The category picked from the other list no longer fits, so it is dropped. */}
         <form.AppField name="kind" listeners={{ onChange: () => form.setFieldValue("categoryId", "") }}>
           {field => (
@@ -83,6 +81,8 @@ export function EntryForm({ editing, onSaved }: Props) {
             />
           )}
         </form.AppField>
+        {me.role === "admin" && <form.AppField name="userId">{() => <UserSelect members={members} />}</form.AppField>}
+        <form.AppField name="groupId">{() => <GroupSelect groups={groups} />}</form.AppField>
         <form.AppField name="categoryId">
           {field => (
             <field.SelectField
